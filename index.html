@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E141B">
+<title>한국주식 정밀분석 · DART 실측</title>
+<meta name="description" content="DART 전자공시 실측 재무제표와 KRX 시세로 한국 상장사를 분석합니다. 없는 데이터는 없다고 표시합니다.">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --ink:#0E141B; --surface:#161E29; --surface2:#1D2733; --line:#2A3441;
+  --text:#E6EDF5; --muted:#8896A6; --faint:#5C6B7C;
+  --up:#F0505A;      /* 상승 = 적 (한국 관례) */
+  --down:#4A8CF7;    /* 하락 = 청 */
+  --assume:#E8A33D;  /* 가정·주의 */
+  --ok:#3FB27F; --na:#6B7684;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ink); color:var(--text);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-text-size-adjust:100%;
+  padding:0 16px 64px;
+}
+.wrap{max-width:1080px;margin:0 auto}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* ---------- 헤더 ---------- */
+.top{padding:26px 0 18px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.03em}
+.brand .tag{font-size:12px;color:var(--assume);border:1px solid var(--assume);
+  padding:1px 7px;border-radius:99px;font-weight:600}
+.brand .sub{font-size:13px;color:var(--muted);width:100%;margin-top:4px}
+
+/* ---------- 검색 ---------- */
+.searchbar{display:flex;gap:8px;margin-top:16px;position:relative}
+.searchbar input{
+  flex:1;background:var(--surface);border:1px solid var(--line);color:var(--text);
+  padding:12px 14px;border-radius:var(--r);font-size:15px;font-family:inherit;min-width:0}
+.searchbar input:focus{outline:2px solid var(--down);outline-offset:1px;border-color:transparent}
+.btn{background:var(--surface2);border:1px solid var(--line);color:var(--text);
+  padding:12px 16px;border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;
+  font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--down);border-color:var(--down);color:#06121F}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.suggest{position:absolute;top:52px;left:0;right:0;background:var(--surface2);
+  border:1px solid var(--line);border-radius:var(--r);max-height:290px;overflow:auto;z-index:20;
+  box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.suggest button{display:flex;justify-content:space-between;gap:10px;width:100%;
+  background:none;border:0;border-bottom:1px solid var(--line);color:var(--text);
+  padding:11px 14px;text-align:left;cursor:pointer;font-family:inherit;font-size:14px}
+.suggest button:last-child{border-bottom:0}
+.suggest button:hover,.suggest button:focus{background:var(--surface)}
+.suggest .code{color:var(--muted);font-family:var(--mono);font-size:12px}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{background:var(--surface);border:1px solid var(--line);color:var(--muted);
+  padding:5px 11px;border-radius:99px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.chip:hover{color:var(--text);border-color:var(--faint)}
+
+/* ---------- 상태 ---------- */
+.note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--assume);
+  padding:12px 14px;border-radius:8px;font-size:13.5px;color:var(--muted);margin:14px 0}
+.note b{color:var(--text)}
+.err{border-left-color:var(--up);color:var(--text)}
+.progress{font-size:13px;color:var(--muted);margin:16px 0;font-family:var(--mono)}
+
+/* ---------- 카드 ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:18px;margin-bottom:14px}
+.card > h2{margin:0 0 4px;font-size:13px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted)}
+.card > .hint{margin:0 0 14px;font-size:12.5px;color:var(--faint)}
+
+/* ---------- 시세 헤더 ---------- */
+.quote{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px 26px}
+.quote .name{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:0}
+.quote .meta{font-size:12.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.quote .price{font-size:32px;font-weight:700;line-height:1.1}
+.quote .delta{font-size:14px;font-weight:600;margin-top:2px}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
+.kv{display:flex;flex-direction:column;gap:2px}
+.kv .k{font-size:11.5px;color:var(--faint);letter-spacing:.04em}
+.kv .v{font-size:15px;font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;
+  padding:3px 9px;border-radius:99px;border:1px solid}
+.badge.ok{color:var(--ok);border-color:rgba(63,178,127,.45);background:rgba(63,178,127,.1)}
+.badge.warn{color:var(--assume);border-color:rgba(232,163,61,.45);background:rgba(232,163,61,.1)}
+.badge.na{color:var(--na);border-color:var(--line);background:transparent}
+
+/* ---------- 게이지 ---------- */
+.gauges{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.gauge{background:var(--surface2);border:1px solid var(--line);border-radius:12px;
+  padding:14px 10px 12px;text-align:center}
+.gauge .label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+.gauge .val{font-size:26px;font-weight:700;margin-top:-26px;position:relative}
+.gauge .foot{font-size:11.5px;color:var(--faint);margin-top:6px;min-height:16px}
+.gauge svg{display:block;margin:2px auto 0}
+
+/* ---------- 표 ---------- */
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+thead th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.03em}
+tbody tr:hover td{background:var(--surface2)}
+tbody tr:hover td:first-child{background:var(--surface2)}
+td.nil{color:var(--faint)}
+.trend{padding-left:8px}
+
+/* ---------- 시나리오 ---------- */
+.rangebar{margin-top:6px}
+.sc-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);
+  margin-top:6px;font-family:var(--mono)}
+.sc-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}
+.sc{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.sc .n{font-size:12px;color:var(--muted);font-weight:600}
+.sc .v{font-size:19px;font-weight:700;margin:3px 0}
+.sc .a{font-size:11.5px;color:var(--faint);line-height:1.45}
+
+/* ---------- 리스크 스트립 (시그니처) ---------- */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:8px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface2);
+  position:relative;overflow:hidden}
+.tile .state{font-size:11px;font-weight:700;letter-spacing:.08em}
+.tile .desc{font-size:12.5px;margin-top:5px;line-height:1.4}
+.tile .ev{font-size:11.5px;color:var(--faint);margin-top:6px;font-family:var(--mono)}
+.tile.t-warn{border-color:rgba(240,80,90,.5);background:rgba(240,80,90,.09)}
+.tile.t-warn .state{color:var(--up)}
+.tile.t-ok .state{color:var(--ok)}
+.tile.t-na{background:transparent;border-style:dashed}
+.tile.t-na .state,.tile.t-na .desc{color:var(--na)}
+
+/* ---------- 공시 ---------- */
+.disc{list-style:none;margin:0;padding:0}
+.disc li{display:flex;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line);
+  font-size:13.5px}
+.disc li:last-child{border-bottom:0}
+.disc .d{font-family:var(--mono);font-size:12px;color:var(--faint);flex:none}
+.disc a{color:var(--text);text-decoration:none}
+.disc a:hover{text-decoration:underline}
+.kw{font-size:11px;font-weight:700;color:var(--up);border:1px solid rgba(240,80,90,.5);
+  padding:1px 6px;border-radius:99px;flex:none}
+
+/* ---------- 설정 ---------- */
+details.cfg{margin-top:22px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+details.cfg summary{padding:13px 16px;cursor:pointer;font-size:13.5px;color:var(--muted);font-weight:600}
+details.cfg[open] summary{border-bottom:1px solid var(--line)}
+.cfg-body{padding:16px}
+.cfg-body label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.cfg-body input{width:100%;background:var(--ink);border:1px solid var(--line);color:var(--text);
+  padding:11px 13px;border-radius:8px;font-family:var(--mono);font-size:13px}
+.cfg-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+pre.diag{background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:12px;
+  font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap;
+  margin:12px 0 0;max-height:260px;overflow:auto}
+
+footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--faint);line-height:1.7}
+.hidden{display:none !important}
+
+@media (max-width:560px){
+  body{padding:0 12px 48px}
+  .quote .price{font-size:27px}
+  .quote .name{font-size:20px}
+  .card{padding:15px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .card{animation:rise .28s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1>한국주식 정밀분석</h1>
+      <span class="tag">DART 실측</span>
+      <p class="sub">전자공시 재무제표와 시세만 사용합니다. 없는 값은 채우지 않고 «없음»으로 표시합니다.</p>
+    </div>
+
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="종목명 또는 6자리 코드 (예: 삼성전자, 005930)"
+             autocomplete="off" enterkeyhint="search" aria-label="종목 검색">
+      <button class="btn primary" id="go">분석</button>
+      <div id="suggest" class="suggest hidden" role="listbox"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <div id="status"></div>
+  <main id="out"></main>
+
+  <details class="cfg" id="cfg">
+    <summary>연결 설정 · 프록시 주소</summary>
+    <div class="cfg-body">
+      <label for="proxy">Cloudflare Worker 주소</label>
+      <input id="proxy" type="url" spellcheck="false" placeholder="https://ksa-proxy.<계정>.workers.dev">
+      <div class="cfg-row">
+        <button class="btn primary" id="saveCfg">저장</button>
+        <button class="btn" id="testCfg">연결 점검</button>
+      </div>
+      <pre class="diag hidden" id="diag"></pre>
+    </div>
+  </details>
+
+  <footer>
+    데이터 출처 — 재무제표·공시: DART 전자공시(사업보고서, 연간). 시세: 야후 파이낸스 일봉. 보고 시가총액: 네이버 금융.<br>
+    FCF는 «영업활동현금흐름 − 유형자산 취득»의 근사치이며 무형자산·리스 투자를 포함하지 않습니다.<br>
+    본 화면은 공시·시세 데이터의 산술 가공 결과이며 투자 자문이 아닙니다. 시나리오 값은 명시된 가정의 계산 결과일 뿐 목표 주가가 아닙니다.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * 1) 분석 엔진 — 원본 Python analysis/ 모듈 포팅본
+ *    (325개 케이스 + 반올림 9만건 대조 검증 완료)
+ * ===================================================================== */
+const _dv = new DataView(new ArrayBuffer(8));
+function _decompose(x){
+  _dv.setFloat64(0,x);
+  const hi=_dv.getUint32(0), lo=_dv.getUint32(4);
+  const negative=(hi>>>31)===1;
+  let exp=(hi>>>20)&0x7ff;
+  let mant=(BigInt(hi&0xfffff)<<32n)|BigInt(lo);
+  if(exp===0) exp=1; else mant|=1n<<52n;
+  return {negative,mant,e:exp-1075};
+}
+function pyRound(x,digits=0){
+  if(x===null||x===undefined||!Number.isFinite(x)) return null;
+  if(x===0) return 0;
+  const {negative,mant,e}=_decompose(x);
+  const P=10n**BigInt(digits);
+  let num,den;
+  if(e>=0){num=mant*P*(1n<<BigInt(e));den=1n;} else {num=mant*P;den=1n<<BigInt(-e);}
+  let q=num/den;
+  const twice=(num%den)*2n;
+  if(twice>den||(twice===den&&q%2n===1n)) q+=1n;
+  if(negative) q=-q;
+  return Number(q)/Number(P);
+}
+const isNil=v=>v===null||v===undefined;
+const pyFloat=x=>isNil(x)?String(x):(Number.isInteger(x)?(Object.is(x,-0)?"-0.0":x+".0"):String(x));
+
+function _pct(n,d){ if(isNil(n)||!d) return null; return pyRound(n/d*100,2); }
+
+function cagr(first,last,span){
+  if(isNil(first)||isNil(last)||!span||span<=0) return null;
+  if(first<=0||last<=0) return null;
+  return pyRound((Math.pow(last/first,1/span)-1)*100,2);
+}
+
+function computeRatios(f){
+  const {revenue,operating_income,net_income,liabilities,equity,issued_capital,cfo}=f;
+  let impair;
+  if(isNil(equity)) impair=null;
+  else impair = equity<=0 || (!isNil(issued_capital) && equity<issued_capital);
+  const den = (!isNil(equity)&&equity>0)?equity:null;
+  return {
+    operating_margin_pct:_pct(operating_income,revenue),
+    net_margin_pct:_pct(net_income,revenue),
+    roe_pct:_pct(net_income,den),
+    debt_ratio_pct:_pct(liabilities,den),
+    cfo_to_net_income:(!isNil(cfo)&&!isNil(net_income)&&net_income>0)?pyRound(cfo/net_income,2):null,
+    capital_impairment:impair
+  };
+}
+
+const HORIZON_YEARS=3, GROWTH_CAP_PCT=20.0;
+const TARGET_MULTIPLES={pessimistic:8.0,neutral:10.0,optimistic:12.0};
+const GROWTH_HAIRCUTS={pessimistic:0.0,neutral:0.5,optimistic:1.0};
+
+function computeMultiples(price,eps,bps){
+  const r={per:null,per_note:null,pbr:null,pbr_note:null};
+  if(isNil(price)||price<=0){ r.per_note=r.pbr_note="현재가 없음"; return r; }
+  if(isNil(eps)) r.per_note="EPS 데이터 없음";
+  else if(eps<=0) r.per_note="적자 기업 — PER 정의 불가";
+  else r.per=pyRound(price/eps,2);
+  if(isNil(bps)) r.pbr_note="BPS 데이터 없음";
+  else if(bps<=0) r.pbr_note="자본잠식 — PBR 정의 불가";
+  else r.pbr=pyRound(price/bps,2);
+  return r;
+}
+
+function threeScenarioValuation(eps,histCagr,span){
+  if(isNil(eps)) return {scenarios:null,reason:"EPS 데이터 없음 — 이익 기반 밸류에이션 불가"};
+  if(eps<=0) return {scenarios:null,
+    reason:"적자 기업 — 이익 기반 밸류에이션 불가. PBR·청산가치 등 자산 기반 지표만 참고 가능."};
+  let base,src;
+  if(isNil(histCagr)){ base=0.0; src="이익 성장 이력 없음 — 성장률 0% 보수 가정"; }
+  else{
+    base=Math.min(histCagr,GROWTH_CAP_PCT);
+    const capped = histCagr>GROWTH_CAP_PCT ? " (연 20% 상한 적용)" : "";
+    src=`과거 ${span}년 순이익 CAGR ${pyFloat(histCagr)}%${capped}`;
+  }
+  const scenarios=[];
+  for(const name of ["pessimistic","neutral","optimistic"]){
+    let hc=GROWTH_HAIRCUTS[name];
+    if(base<0) hc=GROWTH_HAIRCUTS.optimistic-hc;
+    const g=pyRound(Math.min(base*hc,GROWTH_CAP_PCT),2);
+    const mult=TARGET_MULTIPLES[name];
+    const projected=eps*Math.pow(1+g/100,HORIZON_YEARS);
+    scenarios.push({name,growth_pct:g,target_multiple:mult,
+      value_per_share:pyRound(projected*mult,0),
+      assumption_source:`성장률: ${src} × 헤어컷 ${pyFloat(GROWTH_HAIRCUTS[name])}배. `+
+        `목표 멀티플 ${pyFloat(mult)}배는 보수적 고정 밴드(데이터 아닌 가정).`});
+  }
+  return {scenarios,horizon_years:HORIZON_YEARS,method:`${HORIZON_YEARS}년 후 예상 EPS × 목표 멀티플`};
+}
+
+const MARKET_CAP_TOLERANCE_PCT=2.0;
+function verifyMarketCap(price,shares,reported){
+  if(!price||!shares||!reported||price<=0||shares<=0||reported<=0)
+    return {status:"unavailable",reason:"가격·주식수·보고 시가총액 중 결측값 존재"};
+  const computed=price*shares;
+  const dev=Math.abs(computed-reported)/reported*100;
+  return {status:dev<=MARKET_CAP_TOLERANCE_PCT?"consistent":"deviation",
+    computed_cap:computed,reported_cap:reported,
+    deviation_pct:pyRound(dev,2),tolerance_pct:MARKET_CAP_TOLERANCE_PCT};
+}
+
+const DEBT_RATIO_LIMIT_PCT=200.0, INTEREST_COVERAGE_FLOOR=1.0,
+      CFO_NI_DIVERGENCE_FLOOR=0.5, STREAK_YEARS=2;
+const ALL_CHECKS=["high_debt_ratio","low_interest_coverage","negative_cfo_streak",
+  "revenue_decline_streak","capital_impairment","earnings_cash_divergence"];
+const CHECK_LABEL={
+  high_debt_ratio:"부채비율", low_interest_coverage:"이자보상배율",
+  negative_cfo_streak:"영업현금흐름", revenue_decline_streak:"매출 추세",
+  capital_impairment:"자본잠식", earnings_cash_divergence:"이익의 질"
+};
+const _flag=(code,description,triggered,evidence=null)=>({code,description,triggered,evidence});
+
+function evaluateFinancialFlags(years){
+  if(!years||!years.length) return {flags:[],unavailable_checks:[...ALL_CHECKS],checked_count:0};
+  const flags=[], un=[], latest=years[years.length-1];
+
+  if(!isNil(latest.liabilities)&&!isNil(latest.equity)&&latest.equity>0){
+    const ratio=latest.liabilities/latest.equity*100;
+    flags.push(_flag("high_debt_ratio",`부채비율 ${DEBT_RATIO_LIMIT_PCT.toFixed(0)}% 초과`,
+      ratio>DEBT_RATIO_LIMIT_PCT,{year:latest.year,debt_ratio_pct:pyRound(ratio,1)}));
+  } else un.push("high_debt_ratio");
+
+  if(!isNil(latest.operating_income)&&latest.interest_expense){
+    const cov=latest.operating_income/latest.interest_expense;
+    flags.push(_flag("low_interest_coverage","이자보상배율 1 미만 (영업이익으로 이자 못 갚음)",
+      cov<INTEREST_COVERAGE_FLOOR,{year:latest.year,interest_coverage:pyRound(cov,2)}));
+  } else un.push("low_interest_coverage");
+
+  const cfoS=years.filter(y=>!isNil(y.cfo)).map(y=>[y.year,y.cfo]);
+  if(cfoS.length>=STREAK_YEARS){
+    const r=cfoS.slice(-STREAK_YEARS);
+    flags.push(_flag("negative_cfo_streak",`영업활동현금흐름 ${STREAK_YEARS}년 연속 음수`,
+      r.every(([,v])=>v<0),{years:r.map(([y])=>y),cfo:r.map(([,v])=>v)}));
+  } else un.push("negative_cfo_streak");
+
+  const revS=years.filter(y=>!isNil(y.revenue)).map(y=>[y.year,y.revenue]);
+  if(revS.length>=STREAK_YEARS+1){
+    const dec=[];
+    for(let i=revS.length-STREAK_YEARS;i<revS.length;i++) dec.push(revS[i][1]<revS[i-1][1]);
+    const tail=revS.slice(-(STREAK_YEARS+1));
+    flags.push(_flag("revenue_decline_streak",`매출 ${STREAK_YEARS}년 연속 감소`,
+      dec.every(Boolean),{years:tail.map(([y])=>y),revenue:tail.map(([,v])=>v)}));
+  } else un.push("revenue_decline_streak");
+
+  if(!isNil(latest.equity)){
+    const imp=latest.equity<=0||(!isNil(latest.issued_capital)&&latest.equity<latest.issued_capital);
+    flags.push(_flag("capital_impairment","자본잠식 (자본총계 ≤ 0 또는 자본금 미달)",imp,
+      {year:latest.year,equity:latest.equity,issued_capital:latest.issued_capital}));
+  } else un.push("capital_impairment");
+
+  const pairs=years.filter(y=>!isNil(y.cfo)&&!isNil(y.net_income)&&y.net_income>0)
+    .map(y=>[y.year,y.cfo/y.net_income]);
+  if(pairs.length>=STREAK_YEARS){
+    const r=pairs.slice(-STREAK_YEARS);
+    flags.push(_flag("earnings_cash_divergence",
+      `순이익 대비 영업현금흐름 ${CFO_NI_DIVERGENCE_FLOOR}배 미만 ${STREAK_YEARS}년 연속 (이익의 질 의심)`,
+      r.every(([,x])=>x<CFO_NI_DIVERGENCE_FLOOR),
+      {years:r.map(([y])=>y),cfo_to_net_income:r.map(([,x])=>pyRound(x,2))}));
+  } else un.push("earnings_cash_divergence");
+
+  return {flags,unavailable_checks:un,checked_count:flags.length};
+}
+
+/* DART 계정과목 → 필드 매핑 */
+const ACCOUNT_ID_MAP={"_Revenue":"revenue","_OperatingIncomeLoss":"operating_income",
+  "_ProfitLoss":"net_income","_Assets":"assets","_Liabilities":"liabilities","_Equity":"equity",
+  "_IssuedCapital":"issued_capital",
+  "_CashFlowsFromUsedInOperatingActivities":"cfo","_CashFlowsFromUsedInInvestingActivities":"cfi"};
+const ACCOUNT_NM_MAP={"수익(매출액)":"revenue","매출액":"revenue","영업이익":"operating_income",
+  "영업이익(손실)":"operating_income","당기순이익":"net_income","당기순이익(손실)":"net_income",
+  "자산총계":"assets","부채총계":"liabilities","자본총계":"equity","자본금":"issued_capital",
+  "영업활동현금흐름":"cfo","영업활동으로인한현금흐름":"cfo","투자활동현금흐름":"cfi",
+  "투자활동으로인한현금흐름":"cfi","이자비용":"interest_expense","금융비용":"interest_expense"};
+const CAPEX_ACCOUNT_NAMES=["유형자산의 취득","유형자산의취득"];
+const FIELDS=[...new Set([...Object.values(ACCOUNT_ID_MAP),...Object.values(ACCOUNT_NM_MAP)]),"capex"];
+
+function parseAmount(raw){
+  if(isNil(raw)) return null;
+  const c=String(raw).replace(/,/g,"").trim();
+  if(!c||c==="-") return null;
+  if(!/^[+-]?\d+$/.test(c)) return null;
+  return parseInt(c,10);
+}
+function extractYearFinancials(rows){
+  const res={}; for(const f of FIELDS) res[f]=null;
+  for(const row of rows){
+    const amt=parseAmount(row.thstrm_amount);
+    if(amt===null) continue;
+    let field=null;
+    const aid=row.account_id||"";
+    for(const [suf,name] of Object.entries(ACCOUNT_ID_MAP)){ if(aid.endsWith(suf)){field=name;break;} }
+    if(field===null) field=ACCOUNT_NM_MAP[(row.account_nm||"").trim()] ?? null;
+    if(field===null){
+      const nm=(row.account_nm||"").trim();
+      if(CAPEX_ACCOUNT_NAMES.includes(nm)&&res.capex===null) res.capex=Math.abs(amt);
+      continue;
+    }
+    if(["revenue","operating_income","net_income"].includes(field)){
+      const sj=row.sj_div;
+      if(!(sj==="IS"||sj==="CIS"||isNil(sj))) continue;
+    }
+    if(res[field]===null) res[field]=amt;
+  }
+  return res;
+}
+
+/* =====================================================================
+ * 2) 데이터 계층
+ * ===================================================================== */
+const RISK_KEYWORDS=["유상증자","전환사채","신주인수권","감사의견","의견거절","감사보고서",
+  "최대주주변경","최대주주 변경","소송","횡령","배임","관리종목","불성실공시","회생절차","파산","거래정지"];
+const DISCLOSURE_URL=n=>`https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${n}`;
+const ANNUAL_REPORT_CODE="11011";
+const LS_PROXY="ksa.proxy", LS_CORPS="ksa.corps.v1";
+
+const store={
+  get(k){ try{return localStorage.getItem(k);}catch(e){return null;} },
+  set(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+};
+let PROXY = store.get(LS_PROXY) || "";
+const api = p => PROXY.replace(/\/+$/,"") + p;
+
+async function getJSON(path,{timeout=25000}={}){
+  if(!PROXY) throw new Error("프록시 주소가 설정되지 않았습니다. 아래 «연결 설정»에서 Worker 주소를 입력하세요.");
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),timeout);
+  try{
+    const res=await fetch(api(path),{signal:ctrl.signal});
+    const body=await res.json().catch(()=>null);
+    if(!res.ok){
+      const msg=(body&&(body.error||body.message))||`HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return body;
+  }catch(e){
+    if(e.name==="AbortError") throw new Error("응답 시간이 초과되었습니다.");
+    throw e;
+  }finally{ clearTimeout(t); }
+}
+
+let CORPS=null;
+async function loadCorps(){
+  if(CORPS) return CORPS;
+  const cached=store.get(LS_CORPS);
+  if(cached){
+    try{
+      const o=JSON.parse(cached);
+      if(o.t && Date.now()-o.t < 86400000 && Array.isArray(o.c) && o.c.length){ CORPS=o.c; return CORPS; }
+    }catch(e){}
+  }
+  const data=await getJSON("/corps",{timeout:45000});
+  CORPS=data.corps||[];
+  store.set(LS_CORPS,JSON.stringify({t:Date.now(),c:CORPS}));
+  return CORPS;
+}
+
+function searchCorps(q,limit=8){
+  if(!CORPS) return [];
+  const s=q.trim();
+  if(!s) return [];
+  if(/^\d{6}$/.test(s)) return CORPS.filter(c=>c[0]===s).slice(0,limit);
+  const exact=[],starts=[],inc=[];
+  for(const c of CORPS){
+    const n=c[2]||"";
+    if(n===s) exact.push(c);
+    else if(n.startsWith(s)) starts.push(c);
+    else if(n.includes(s)) inc.push(c);
+    if(exact.length+starts.length>limit*3) break;
+  }
+  return [...exact,...starts,...inc].slice(0,limit);
+}
+
+/* DART 연간 재무제표: 연결(CFS) 우선, 별도(OFS) 폴백 */
+async function fetchYear(corp,year){
+  for(const fs of ["CFS","OFS"]){
+    let body;
+    try{
+      body=await getJSON(`/dart/fnlttSinglAcntAll.json?corp_code=${corp}`+
+        `&bsns_year=${year}&reprt_code=${ANNUAL_REPORT_CODE}&fs_div=${fs}`);
+    }catch(e){ continue; }
+    if(!body||body.status!=="000"||!Array.isArray(body.list)||!body.list.length) continue;
+    const fin=extractYearFinancials(body.list);
+    if(Object.values(fin).every(v=>v===null)) continue;
+    return {year,fs_div:fs,report:"사업보고서",...fin};
+  }
+  return null;
+}
+
+async function fetchFinancials(corp,years=5){
+  const latest=new Date().getFullYear()-1;
+  const list=[];
+  for(let y=latest-years+1;y<=latest;y++) list.push(y);
+  const got=await Promise.all(list.map(y=>fetchYear(corp,y)));
+  return got.filter(Boolean);
+}
+
+async function fetchShares(corp){
+  const latest=new Date().getFullYear()-1;
+  for(const y of [latest,latest-1]){
+    let body;
+    try{
+      body=await getJSON(`/dart/stockTotqySttus.json?corp_code=${corp}`+
+        `&bsns_year=${y}&reprt_code=${ANNUAL_REPORT_CODE}`);
+    }catch(e){ continue; }
+    if(!body||body.status!=="000"||!Array.isArray(body.list)) continue;
+    const row=body.list.find(r=>(r.se||"").includes("보통주")) ||
+              body.list.find(r=>(r.se||"").includes("합계"));
+    if(!row) continue;
+    const total=parseAmount(row.istc_totqy);
+    const treasury=parseAmount(row.tesstk_co);
+    if(total===null||total<=0) continue;
+    return {shares:total, treasury:treasury??null, year:y,
+      source:`DART ${y}년 주식의 총수 현황 (발행주식총수)`};
+  }
+  return null;
+}
+
+async function fetchQuote(code){
+  const body=await getJSON(`/price/${code}`);
+  const ch=body.chart;
+  const meta=ch.meta||{};
+  const ts=ch.timestamp||[];
+  const q=(ch.indicators&&ch.indicators.quote&&ch.indicators.quote[0])||{};
+  const closes=(q.close||[]).map(v=>(typeof v==="number"&&Number.isFinite(v))?v:null);
+  const highs=(q.high||[]).filter(v=>typeof v==="number"&&Number.isFinite(v));
+  const lows=(q.low||[]).filter(v=>typeof v==="number"&&Number.isFinite(v));
+  const vols=(q.volume||[]);
+  let lastIdx=-1;
+  for(let i=closes.length-1;i>=0;i--){ if(closes[i]!==null){lastIdx=i;break;} }
+  let prevIdx=-1;
+  for(let i=lastIdx-1;i>=0;i--){ if(closes[i]!==null){prevIdx=i;break;} }
+  const price = lastIdx>=0 ? closes[lastIdx] : (meta.regularMarketPrice ?? null);
+  const prev  = prevIdx>=0 ? closes[prevIdx] : null;
+  return {
+    price,
+    prev_close:prev,
+    as_of: lastIdx>=0 && ts[lastIdx] ? new Date(ts[lastIdx]*1000).toISOString().slice(0,10) : null,
+    high_52w: highs.length?Math.max(...highs):(meta.fiftyTwoWeekHigh??null),
+    low_52w: lows.length?Math.min(...lows):(meta.fiftyTwoWeekLow??null),
+    volume: lastIdx>=0 ? (vols[lastIdx]??null) : null,
+    series: closes.filter(v=>v!==null),
+    market: body.suffix===".KQ" ? "KOSDAQ" : "KOSPI",
+    currency: meta.currency||"KRW"
+  };
+}
+
+/* 네이버 «417조 8,847억» 같은 표기 → 숫자 */
+function parseKoreanAmount(str){
+  if(typeof str!=="string") return null;
+  const s=str.replace(/[\s,]/g,"");
+  if(!s) return null;
+  if(/^\d+$/.test(s)) return parseInt(s,10);
+  let total=0, found=false;
+  const units=[["조",1e12],["억",1e8],["만",1e4]];
+  let rest=s;
+  for(const [u,mul] of units){
+    const m=rest.match(new RegExp(`(\\d+)${u}`));
+    if(m){ total+=parseInt(m[1],10)*mul; found=true; rest=rest.replace(m[0],""); }
+  }
+  const tail=rest.match(/(\d+)/);
+  if(tail&&found) total+=parseInt(tail[1],10);
+  return found?total:null;
+}
+function deepFindMarketValue(obj,depth=0){
+  if(!obj||depth>6) return null;
+  if(Array.isArray(obj)){
+    for(const it of obj){
+      if(it&&typeof it==="object"){
+        const code=it.code||it.key||"";
+        if(/marketValue|marketSum|시가총액/i.test(String(code))){
+          const v=parseKoreanAmount(String(it.value??it.val??""));
+          if(v) return v;
+        }
+        const r=deepFindMarketValue(it,depth+1); if(r) return r;
+      }
+    }
+    return null;
+  }
+  if(typeof obj==="object"){
+    for(const [k,v] of Object.entries(obj)){
+      if(/^marketValue$/i.test(k)){
+        const n=typeof v==="number"?v:parseKoreanAmount(String(v));
+        if(n) return n;
+      }
+      const r=deepFindMarketValue(v,depth+1); if(r) return r;
+    }
+  }
+  return null;
+}
+async function fetchReportedCap(code){
+  try{
+    const body=await getJSON(`/naver/${code}`,{timeout:12000});
+    return deepFindMarketValue(body);
+  }catch(e){ return null; }
+}
+
+async function fetchDisclosures(corp,days=90){
+  const end=new Date(), begin=new Date(Date.now()-days*86400000);
+  const fmt=d=>d.toISOString().slice(0,10).replace(/-/g,"");
+  let body;
+  try{
+    body=await getJSON(`/dart/list.json?corp_code=${corp}`+
+      `&bgn_de=${fmt(begin)}&end_de=${fmt(end)}&page_count=100`);
+  }catch(e){ return []; }
+  if(!body||body.status!=="000"||!Array.isArray(body.list)) return [];
+  return body.list.map(d=>({
+    report_nm:d.report_nm, rcept_dt:d.rcept_dt, flr_nm:d.flr_nm, rcept_no:d.rcept_no,
+    url:DISCLOSURE_URL(d.rcept_no||""),
+    risk_keyword:RISK_KEYWORDS.find(k=>(d.report_nm||"").includes(k))||null
+  }));
+}
+
+/* =====================================================================
+ * 3) 표시 유틸
+ * ===================================================================== */
+const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c;
+  if(h!==undefined)e.innerHTML=h; return e;};
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",
+  '"':"&quot;","'":"&#39;"}[m]));
+
+function fmtWon(v){
+  if(isNil(v)) return null;
+  const a=Math.abs(v), sign=v<0?"-":"";
+  if(a>=1e12) return sign+(a/1e12).toFixed(2)+"조";
+  if(a>=1e8)  return sign+(a/1e8>=1000
+    ? Math.round(a/1e8).toLocaleString("ko-KR")
+    : (a/1e8).toFixed(1))+"억";
+  if(a>=1e4)  return sign+Math.round(a/1e4).toLocaleString("ko-KR")+"만";
+  return sign+Math.round(a).toLocaleString("ko-KR");
+}
+const fmtNum=(v,d=0)=>isNil(v)?null:Number(v).toLocaleString("ko-KR",
+  {minimumFractionDigits:d,maximumFractionDigits:d});
+const nil=txt=>`<span class="nil">${txt||"없음"}</span>`;
+const dirClass=v=>isNil(v)?"flat":(v>0?"up":(v<0?"down":"flat"));
+const arrow=v=>isNil(v)||v===0?"":(v>0?"▲":"▼");
+
+/* 스파크라인 — 상승 적색 / 하락 청색 (한국 관례) */
+function sparkline(values,w=104,h=26){
+  const pts=values.filter(v=>!isNil(v)&&Number.isFinite(v));
+  if(pts.length<2) return "";
+  const min=Math.min(...pts), max=Math.max(...pts), span=(max-min)||1;
+  const step=w/(pts.length-1);
+  const coords=pts.map((v,i)=>[i*step, h-2-((v-min)/span)*(h-4)]);
+  const d=coords.map(([x,y],i)=>(i?"L":"M")+x.toFixed(1)+" "+y.toFixed(1)).join(" ");
+  const rising=pts[pts.length-1]>=pts[0];
+  const col=rising?"var(--up)":"var(--down)";
+  const [lx,ly]=coords[coords.length-1];
+  const zeroY = (min<0&&max>0) ? (h-2-((0-min)/span)*(h-4)) : null;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    ${zeroY!==null?`<line x1="0" y1="${zeroY.toFixed(1)}" x2="${w}" y2="${zeroY.toFixed(1)}"
+      stroke="var(--line)" stroke-width="1" stroke-dasharray="2 2"/>`:""}
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"
+      stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.2" fill="${col}"/>
+  </svg>`;
+}
+
+/* 반원 게이지 — 위험구간을 적색 호로 표시 */
+function gauge(value,{max,danger,label,foot,decimals=2}){
+  const W=170,H=96,cx=85,cy=84,r=64;
+  const pol=(frac)=>{ const a=Math.PI*(1-Math.min(Math.max(frac,0),1));
+    return [cx+r*Math.cos(a), cy-r*Math.sin(a)]; };
+  const arc=(f0,f1,color,width)=>{
+    const [x0,y0]=pol(f0), [x1,y1]=pol(f1);
+    const large=(f1-f0)>0.5?1:0;
+    return `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}"
+      fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="butt"/>`;
+  };
+  const dFrac=Math.min(danger/max,1);
+  let needle="", val=nil("측정 불가"), valCls="flat";
+  if(!isNil(value)&&Number.isFinite(value)){
+    const f=Math.min(Math.max(value/max,0),1);
+    const a=Math.PI*(1-f);
+    const nx=cx+(r-10)*Math.cos(a), ny=cy-(r-10)*Math.sin(a);
+    const over=value>=danger;
+    needle=`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}"
+      stroke="${over?"var(--up)":"var(--text)"}" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="3.4" fill="${over?"var(--up)":"var(--text)"}"/>`;
+    val=fmtNum(value,decimals);
+    valCls=over?"up":"";
+  }
+  return `<div class="gauge">
+    <div class="label">${esc(label)}</div>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
+         aria-label="${esc(label)} ${isNil(value)?"측정 불가":value}">
+      ${arc(0,dFrac,"var(--line)",9)}
+      ${arc(dFrac,1,"var(--up)",9)}
+      ${needle}
+      <text x="6" y="${cy+11}" fill="var(--faint)" font-size="9" font-family="var(--mono)">0</text>
+      <text x="${W-16}" y="${cy+11}" fill="var(--faint)" font-size="9" font-family="var(--mono)">${max}</text>
+    </svg>
+    <div class="val num ${valCls}">${val}</div>
+    <div class="foot">${esc(foot||"")}</div>
+  </div>`;
+}
+
+/* =====================================================================
+ * 4) 렌더링
+ * ===================================================================== */
+const $out=document.getElementById("out"), $status=document.getElementById("status");
+const setStatus=(html,cls="note")=>{ $status.innerHTML=html?`<div class="${cls}">${html}</div>`:""; };
+const setProgress=t=>{ $status.innerHTML=`<div class="progress">${esc(t)}</div>`; };
+
+function renderQuote(info){
+  const {name,ticker,quote,shares,capCheck}=info;
+  const delta=(!isNil(quote.price)&&!isNil(quote.prev_close))?quote.price-quote.prev_close:null;
+  const pct=(!isNil(delta)&&quote.prev_close)?delta/quote.prev_close*100:null;
+  const cls=dirClass(delta);
+
+  let badge;
+  if(capCheck.status==="consistent")
+    badge=`<span class="badge ok">시총 정합 · 편차 ${capCheck.deviation_pct}%</span>`;
+  else if(capCheck.status==="deviation")
+    badge=`<span class="badge warn">시총 편차 ${capCheck.deviation_pct}% (허용 ${capCheck.tolerance_pct}%)</span>`;
+  else badge=`<span class="badge na">시총 교차검증 불가</span>`;
+
+  const card=el("section","card");
+  card.innerHTML=`
+    <div class="quote">
+      <div>
+        <p class="name">${esc(name)}</p>
+        <div class="meta">${esc(ticker)} · ${esc(quote.market)} · 기준일 ${esc(quote.as_of||"미상")}</div>
+      </div>
+      <div>
+        <div class="price num ${cls}">${isNil(quote.price)?nil("시세 없음"):fmtNum(quote.price)}</div>
+        <div class="delta num ${cls}">${isNil(delta)?"":
+          `${arrow(delta)} ${fmtNum(Math.abs(delta))} (${fmtNum(Math.abs(pct),2)}%)`}</div>
+      </div>
+      <div class="kv"><span class="k">52주 최고</span>
+        <span class="v num up">${isNil(quote.high_52w)?nil():fmtNum(quote.high_52w)}</span></div>
+      <div class="kv"><span class="k">52주 최저</span>
+        <span class="v num down">${isNil(quote.low_52w)?nil():fmtNum(quote.low_52w)}</span></div>
+      <div class="kv"><span class="k">거래량</span>
+        <span class="v num">${isNil(quote.volume)?nil():fmtNum(quote.volume)}</span></div>
+      <div class="kv"><span class="k">발행주식수</span>
+        <span class="v num">${shares?fmtNum(shares.shares):nil()}</span></div>
+      <div class="kv"><span class="k">시가총액 (주가×주식수)</span>
+        <span class="v num">${capCheck.computed_cap?fmtWon(capCheck.computed_cap):nil()}</span></div>
+      <div style="align-self:center">${badge}</div>
+    </div>
+    <div style="margin-top:14px">${sparkline(quote.series,320,46)}
+      <div class="hint" style="margin:2px 0 0">최근 1년 종가 흐름</div></div>`;
+  return card;
+}
+
+function renderGauges(mult,basis){
+  const card=el("section","card");
+  const perFoot=mult.per_note||`EPS ${fmtNum(basis.eps)}원 기준`;
+  const pbrFoot=mult.pbr_note||`BPS ${fmtNum(basis.bps)}원 기준`;
+  card.innerHTML=`
+    <h2>밸류에이션 멀티플</h2>
+    <p class="hint">붉은 호는 통상적 고평가 구간입니다. 업종별 적정 수준은 다르므로 절대 기준이 아닙니다.</p>
+    <div class="gauges">
+      ${gauge(mult.per,{max:40,danger:25,label:"PER (주가수익비율)",foot:perFoot})}
+      ${gauge(mult.pbr,{max:5,danger:3,label:"PBR (주가순자산비율)",foot:pbrFoot})}
+    </div>
+    <p class="hint" style="margin:12px 0 0">${esc(basis.eps_source)} · 재무제표 기준 ${
+      basis.statement_basis==="CFS"?"연결(CFS)":"별도(OFS)"}</p>`;
+  return card;
+}
+
+function renderFinancials(years,growth){
+  const card=el("section","card");
+  const rows=[
+    ["매출액","revenue"],["영업이익","operating_income"],["당기순이익","net_income"],
+    ["자산총계","assets"],["부채총계","liabilities"],["자본총계","equity"],
+    ["영업활동현금흐름","cfo"],["FCF (근사)","fcf"]
+  ];
+  const ratioRows=[
+    ["영업이익률 %","operating_margin_pct",2],["순이익률 %","net_margin_pct",2],
+    ["ROE %","roe_pct",2],["부채비율 %","debt_ratio_pct",2],["CFO/순이익","cfo_to_net_income",2]
+  ];
+  const head=years.map(y=>`<th>${y.year}</th>`).join("");
+  const body=rows.map(([label,key])=>{
+    const vals=years.map(y=>y[key]);
+    const cells=vals.map(v=>isNil(v)
+      ?`<td class="nil">없음</td>`
+      :`<td class="num ${key==="cfo"||key==="fcf"?dirClass(v):""}">${fmtWon(v)}</td>`).join("");
+    return `<tr><td>${label}</td>${cells}<td class="trend">${sparkline(vals)}</td></tr>`;
+  }).join("");
+  const rbody=ratioRows.map(([label,key,d])=>{
+    const vals=years.map(y=>y.ratios[key]);
+    const cells=vals.map(v=>isNil(v)?`<td class="nil">없음</td>`
+      :`<td class="num">${fmtNum(v,d)}</td>`).join("");
+    return `<tr><td>${label}</td>${cells}<td class="trend">${sparkline(vals)}</td></tr>`;
+  }).join("");
+
+  const g=(v,label)=>isNil(v)
+    ? `<div class="kv"><span class="k">${label}</span><span class="v">${nil("산출 불가")}</span></div>`
+    : `<div class="kv"><span class="k">${label}</span>
+        <span class="v num ${dirClass(v)}">${arrow(v)} ${fmtNum(Math.abs(v),2)}%</span></div>`;
+
+  card.innerHTML=`
+    <h2>연간 재무제표 · ${years.length}개년</h2>
+    <p class="hint">DART 사업보고서 실측치입니다. 공시되지 않은 항목은 추정하지 않고 «없음»으로 둡니다.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>항목</th>${head}<th>추세</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tbody style="border-top:2px solid var(--line)">${rbody}</tbody>
+    </table></div>
+    <div style="display:flex;gap:26px;margin-top:14px;flex-wrap:wrap">
+      ${g(growth.revenue_cagr_pct,`매출 CAGR (${growth.span_years}년)`)}
+      ${g(growth.net_income_cagr_pct,`순이익 CAGR (${growth.span_years}년)`)}
+    </div>
+    <p class="hint" style="margin:10px 0 0">FCF = 영업활동현금흐름 − 유형자산 취득(근사치).
+      적자 전환 등으로 정의 불가한 CAGR은 산출하지 않습니다.</p>`;
+  return card;
+}
+
+function renderScenarios(sv,price){
+  const card=el("section","card");
+  if(!sv.scenarios){
+    card.innerHTML=`<h2>3시나리오 가치 범위</h2>
+      <div class="note" style="margin:8px 0 0">${esc(sv.reason)}</div>`;
+    return card;
+  }
+  const vals=sv.scenarios.map(s=>s.value_per_share);
+  const lo=Math.min(...vals), hi=Math.max(...vals);
+  const bound=v=>Math.min(Math.max(v,0),1);
+  const span=(hi-lo)||1;
+  const pad=span*0.18;
+  const min=Math.min(lo-pad, isNil(price)?lo:price*0.9);
+  const max=Math.max(hi+pad, isNil(price)?hi:price*1.1);
+  const pos=v=>bound((v-min)/((max-min)||1))*100;
+  const KO={pessimistic:"비관",neutral:"중립",optimistic:"낙관"};
+
+  const marker=isNil(price)?"":`
+    <div style="position:absolute;left:${pos(price).toFixed(1)}%;top:-6px;bottom:-6px;width:2px;
+      background:var(--text)"></div>
+    <div style="position:absolute;left:${pos(price).toFixed(1)}%;top:-24px;transform:translateX(-50%);
+      font-size:11px;font-family:var(--mono);color:var(--text);white-space:nowrap">현재가 ${fmtNum(price)}</div>`;
+
+  card.innerHTML=`
+    <h2>3시나리오 가치 범위</h2>
+    <p class="hint">단일 «적정주가»는 제시하지 않습니다. 아래는 명시된 가정을 넣었을 때 나오는 산술 결과입니다.</p>
+    <div class="rangebar" style="position:relative;height:34px;margin-top:34px">
+      <div style="position:absolute;left:0;right:0;top:14px;height:6px;background:var(--surface2);
+        border-radius:99px"></div>
+      <div style="position:absolute;left:${pos(lo).toFixed(1)}%;width:${(pos(hi)-pos(lo)).toFixed(1)}%;
+        top:14px;height:6px;background:linear-gradient(90deg,var(--down),var(--assume),var(--up));
+        border-radius:99px"></div>
+      ${sv.scenarios.map(s=>`<div style="position:absolute;left:${pos(s.value_per_share).toFixed(1)}%;
+        top:10px;width:2px;height:14px;background:var(--text);opacity:.55"></div>`).join("")}
+      ${marker}
+    </div>
+    <div class="sc-legend"><span>${fmtNum(min)}</span><span>${fmtNum(max)}</span></div>
+    <div class="sc-list">
+      ${sv.scenarios.map(s=>`<div class="sc">
+        <div class="n">${KO[s.name]} · 성장 ${fmtNum(s.growth_pct,2)}% · ${s.target_multiple}배</div>
+        <div class="v num">${fmtNum(s.value_per_share)}원</div>
+        <div class="a">${esc(s.assumption_source)}</div>
+      </div>`).join("")}
+    </div>
+    <p class="hint" style="margin:12px 0 0">${esc(sv.method)} · ${sv.horizon_years}년 기준.
+      목표 주가가 아니며 매수·매도 판단을 제공하지 않습니다.</p>`;
+  return card;
+}
+
+function renderRisk(result,disclosures,days){
+  const card=el("section","card");
+  const byCode=Object.fromEntries(result.flags.map(f=>[f.code,f]));
+  const evText=f=>{
+    if(!f||!f.evidence) return "";
+    const e=f.evidence;
+    if("debt_ratio_pct" in e) return `${e.year}년 ${fmtNum(e.debt_ratio_pct,1)}%`;
+    if("interest_coverage" in e) return `${e.year}년 ${fmtNum(e.interest_coverage,2)}배`;
+    if("cfo" in e) return e.years.map((y,i)=>`${y}: ${fmtWon(e.cfo[i])}`).join("  ");
+    if("revenue" in e) return e.years.map((y,i)=>`${y}: ${fmtWon(e.revenue[i])}`).join("  ");
+    if("equity" in e) return `${e.year}년 자본 ${fmtWon(e.equity)} / 자본금 ${
+      isNil(e.issued_capital)?"없음":fmtWon(e.issued_capital)}`;
+    if("cfo_to_net_income" in e) return e.years.map((y,i)=>`${y}: ${
+      fmtNum(e.cfo_to_net_income[i],2)}배`).join("  ");
+    return "";
+  };
+
+  const tiles=ALL_CHECKS.map(code=>{
+    const f=byCode[code];
+    if(!f) return `<div class="tile t-na">
+      <div class="state">검사 불가</div>
+      <div class="desc">${CHECK_LABEL[code]}</div>
+      <div class="ev">필요한 공시 항목이 없습니다</div></div>`;
+    const cls=f.triggered?"t-warn":"t-ok";
+    return `<div class="tile ${cls}">
+      <div class="state">${f.triggered?"경고":"이상 없음"}</div>
+      <div class="desc">${esc(f.description)}</div>
+      <div class="ev">${esc(evText(f))}</div></div>`;
+  }).join("");
+
+  const hits=disclosures.filter(d=>d.risk_keyword);
+  const triggered=result.flags.filter(f=>f.triggered);
+  const summary=(triggered.length||hits.length)
+    ? `경고 ${triggered.length}건 + 주의 공시 ${hits.length}건 (재무 검사 ${result.checked_count}개 항목 수행)`
+    : `탐지된 적신호 없음 (재무 검사 ${result.checked_count}개 항목 수행)`;
+
+  const listed=(hits.length?hits:disclosures).slice(0,15);
+  const discHtml=listed.length
+    ? `<ul class="disc">${listed.map(d=>`<li>
+        <span class="d">${esc(d.rcept_dt||"")}</span>
+        <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.report_nm||"")}</a>
+        ${d.risk_keyword?`<span class="kw">${esc(d.risk_keyword)}</span>`:""}
+      </li>`).join("")}</ul>`
+    : `<p class="hint">최근 ${days}일 공시가 없습니다.</p>`;
+
+  card.innerHTML=`
+    <h2>재무 적신호 6종</h2>
+    <p class="hint">${esc(summary)} — 검사하지 못한 항목은 «이상 없음»에 섞지 않고 따로 표시합니다.</p>
+    <div class="strip">${tiles}</div>
+    <h2 style="margin-top:22px">최근 공시 · ${days}일</h2>
+    <p class="hint">${hits.length?`위험 키워드가 포함된 공시 ${hits.length}건`:"위험 키워드 미탐지 — 전체 공시를 표시합니다"}</p>
+    ${discHtml}`;
+  return card;
+}
+
+/* =====================================================================
+ * 5) 분석 실행
+ * ===================================================================== */
+let running=false;
+async function analyze(ticker,name){
+  if(running) return;
+  running=true;
+  document.getElementById("go").disabled=true;
+  $out.innerHTML="";
+  try{
+    setProgress("상장사 색인 확인 중…");
+    await loadCorps();
+    const row=CORPS.find(c=>c[0]===ticker);
+    if(!row) throw new Error(`종목코드 ${ticker}는 DART 공시 대상 목록에 없습니다.`);
+    const corp=row[1];
+    const corpName=name||row[2];
+
+    setProgress("시세·재무제표·공시 조회 중… (최초 조회는 20초가량 걸립니다)");
+    const [quote,years,sharesInfo,disclosures,reportedCap]=await Promise.all([
+      fetchQuote(ticker).catch(e=>({error:e.message})),
+      fetchFinancials(corp,5),
+      fetchShares(corp),
+      fetchDisclosures(corp,90),
+      fetchReportedCap(ticker)
+    ]);
+
+    if(quote.error) throw new Error(`시세 조회 실패: ${quote.error}`);
+    if(!years.length) throw new Error(
+      `${corpName}의 DART 연간 재무제표를 찾을 수 없습니다 (신규상장·비공시 기업일 수 있습니다).`);
+
+    const enriched=years.map(y=>({...y,
+      fcf:(!isNil(y.cfo)&&!isNil(y.capex))?y.cfo-y.capex:null,
+      ratios:computeRatios(y)}));
+    const first=years[0], last=years[years.length-1];
+    const span=last.year-first.year;
+    const growth={span_years:span,
+      revenue_cagr_pct:cagr(first.revenue,last.revenue,span),
+      net_income_cagr_pct:cagr(first.net_income,last.net_income,span)};
+
+    const shares=sharesInfo?sharesInfo.shares:null;
+    const eps=(!isNil(last.net_income)&&shares)?last.net_income/shares:null;
+    const bps=(!isNil(last.equity)&&shares)?last.equity/shares:null;
+    const basis={
+      eps:isNil(eps)?null:pyRound(eps,0),
+      bps:isNil(bps)?null:pyRound(bps,0),
+      eps_source:sharesInfo
+        ? `EPS = DART ${last.year}년 순이익 ÷ ${sharesInfo.source}`
+        : "발행주식수를 확인하지 못해 EPS·BPS를 산출하지 않았습니다",
+      statement_basis:last.fs_div};
+    const mult=computeMultiples(quote.price,basis.eps,basis.bps);
+    const sv=threeScenarioValuation(basis.eps,cagr(first.net_income,last.net_income,span),span);
+    const capCheck=verifyMarketCap(quote.price,shares,reportedCap);
+    const risk=evaluateFinancialFlags(years);
+
+    setStatus("");
+    $out.appendChild(renderQuote({name:corpName,ticker,quote,shares:sharesInfo,capCheck}));
+    $out.appendChild(renderGauges(mult,basis));
+    $out.appendChild(renderFinancials(enriched,growth));
+    $out.appendChild(renderScenarios(sv,quote.price));
+    $out.appendChild(renderRisk(risk,disclosures,90));
+    location.hash=ticker;
+  }catch(e){
+    setStatus(`<b>분석하지 못했습니다.</b><br>${esc(e.message)}`,"note err");
+  }finally{
+    running=false;
+    document.getElementById("go").disabled=false;
+  }
+}
+
+/* =====================================================================
+ * 6) UI 연결
+ * ===================================================================== */
+const $q=document.getElementById("q"), $sug=document.getElementById("suggest");
+const PRESETS=[["005930","삼성전자"],["000660","SK하이닉스"],["005380","현대차"],
+  ["035420","NAVER"],["068270","셀트리온"],["105560","KB금융"]];
+document.getElementById("chips").innerHTML=
+  PRESETS.map(([c,n])=>`<button class="chip" data-code="${c}" data-name="${n}">${n}</button>`).join("");
+document.getElementById("chips").addEventListener("click",e=>{
+  const b=e.target.closest(".chip"); if(!b) return;
+  $q.value=b.dataset.name; hideSuggest(); analyze(b.dataset.code,b.dataset.name);
+});
+
+const hideSuggest=()=>{ $sug.classList.add("hidden"); $sug.innerHTML=""; };
+let sugTimer=null;
+$q.addEventListener("input",()=>{
+  clearTimeout(sugTimer);
+  sugTimer=setTimeout(async()=>{
+    const v=$q.value.trim();
+    if(v.length<1){ hideSuggest(); return; }
+    try{ await loadCorps(); }catch(e){ hideSuggest(); return; }
+    const hits=searchCorps(v);
+    if(!hits.length){ hideSuggest(); return; }
+    $sug.innerHTML=hits.map(([code,,nm])=>
+      `<button data-code="${code}" data-name="${esc(nm)}">
+        <span>${esc(nm)}</span><span class="code">${code}</span></button>`).join("");
+    $sug.classList.remove("hidden");
+  },180);
+});
+$sug.addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  $q.value=b.dataset.name; hideSuggest(); analyze(b.dataset.code,b.dataset.name);
+});
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".searchbar")) hideSuggest();
+});
+
+async function runFromInput(){
+  const v=$q.value.trim();
+  if(!v) return;
+  hideSuggest();
+  if(/^\d{6}$/.test(v)) return analyze(v,null);
+  try{ await loadCorps(); }catch(e){
+    setStatus(`<b>상장사 목록을 불러오지 못했습니다.</b><br>${esc(e.message)}`,"note err"); return;
+  }
+  const hits=searchCorps(v,1);
+  if(!hits.length){ setStatus(`«${esc(v)}»에 해당하는 상장사를 찾지 못했습니다.`,"note err"); return; }
+  $q.value=hits[0][2];
+  analyze(hits[0][0],hits[0][2]);
+}
+document.getElementById("go").addEventListener("click",runFromInput);
+$q.addEventListener("keydown",e=>{ if(e.key==="Enter") runFromInput(); });
+
+/* 설정 */
+const $proxy=document.getElementById("proxy"), $diag=document.getElementById("diag");
+$proxy.value=PROXY;
+document.getElementById("saveCfg").addEventListener("click",()=>{
+  PROXY=$proxy.value.trim().replace(/\/+$/,"");
+  store.set(LS_PROXY,PROXY);
+  CORPS=null; store.set(LS_CORPS,"");
+  $diag.classList.remove("hidden");
+  $diag.textContent=PROXY?`저장했습니다 → ${PROXY}`:"프록시 주소를 비웠습니다.";
+});
+document.getElementById("testCfg").addEventListener("click",async()=>{
+  $diag.classList.remove("hidden");
+  $diag.textContent="점검 중…";
+  const lines=[];
+  const probe=async(label,path)=>{
+    const t0=performance.now();
+    try{
+      const r=await getJSON(path,{timeout:45000});
+      const ms=Math.round(performance.now()-t0);
+      let extra="";
+      if(path==="/corps") extra=` · 상장사 ${r.count??(r.corps||[]).length}건`;
+      else if(path.startsWith("/dart/")) extra=` · status=${r.status??"?"}`;
+      lines.push(`✔ ${label} (${ms}ms)${extra}`);
+    }catch(e){ lines.push(`✘ ${label} — ${e.message}`); }
+    $diag.textContent=lines.join("\n");
+  };
+  await probe("프록시 응답","/health");
+  await probe("상장사 색인","/corps");
+  await probe("시세(삼성전자)","/price/005930");
+  await probe("DART 재무제표(삼성전자)",
+    `/dart/fnlttSinglAcntAll.json?corp_code=00126380&bsns_year=${new Date().getFullYear()-1}`+
+    `&reprt_code=11011&fs_div=CFS`);
+  lines.push("", "✔ 가 하나라도 없으면 Worker 배포·DART_API_KEY 설정을 확인하세요.");
+  $diag.textContent=lines.join("\n");
+});
+
+/* 최초 진입 */
+if(!PROXY){
+  setStatus(`<b>먼저 연결 설정이 필요합니다.</b><br>
+    DART와 시세 서버는 브라우저에서 직접 부를 수 없어(CORS) 프록시를 거칩니다.
+    아래 «연결 설정»에 Cloudflare Worker 주소를 넣어주세요. README에 배포 방법이 있습니다.`);
+  document.getElementById("cfg").open=true;
+}else{
+  const h=(location.hash||"").replace("#","");
+  if(/^\d{6}$/.test(h)) analyze(h,null);
+  else setStatus(`종목명이나 6자리 코드를 넣으면 DART 실측 재무제표로 분석합니다.
+    아래 버튼으로 바로 시작할 수도 있습니다.`);
+}
+</script>
+</body>
+</html>

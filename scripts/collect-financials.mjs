@@ -52,8 +52,7 @@ async function fetchCorpIndex() {
   } else {
     // 중앙 디렉터리 앞까지가 압축 데이터
     const cd = buf.lastIndexOf(Buffer.from('PK\x01\x02'));
-    xml = unzipSync(buf.subarray(start, cd > start ? cd : undefined),
-      { finishFlush: 2 /* Z_SYNC_FLUSH */, windowBits: -15 }).toString('utf8');
+    xml = unzipSync(buf.subarray(start, cd > start ? cd : undefined)).toString('utf8');
   }
 
   const map = new Map();

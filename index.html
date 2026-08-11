@@ -143,6 +143,18 @@ body{
   .srow .sv{text-align:left;grid-column:1/3}
 }
 
+/* ---------- 점수 구간 눈금자 ---------- */
+.bandwrap{margin-top:16px}
+.bandbar{display:flex;height:12px;border-radius:99px;overflow:visible;position:relative;
+  background:var(--surface2)}
+.bandbar i{display:block;height:100%;opacity:.5}
+.bandbar i:first-child{border-radius:99px 0 0 99px}
+.bandbar i:last-child{border-radius:0 99px 99px 0}
+.bandmark{position:absolute;top:-5px;width:4px;height:22px;background:var(--text);
+  border-radius:2px;transform:translateX(-50%);box-shadow:0 0 0 2px var(--surface)}
+.bandticks{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);
+  margin-top:7px;font-family:var(--mono)}
+
 /* ---------- 종합 정리 카드 ---------- */
 .verdict-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
 .verdict-item{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface2)}
@@ -173,7 +185,8 @@ body{
 .gauge{background:var(--surface2);border:1px solid var(--line);border-radius:12px;
   padding:14px 10px 12px;text-align:center}
 .gauge .label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em}
-.gauge .val{font-size:26px;font-weight:700;margin-top:-26px;position:relative}
+.gauge .val{font-size:26px;font-weight:800;margin-top:4px;position:relative;line-height:1.15}
+.gauge .val .ovf{font-size:12px;font-weight:700;color:var(--assume);margin-left:4px;vertical-align:middle}
 .gauge .foot{font-size:11.5px;color:var(--faint);margin-top:6px;min-height:16px}
 .gauge svg{display:block;margin:2px auto 0}
 
@@ -507,12 +520,23 @@ function buildScorecard({mult,roe,growth,quote}){
   return {items,total,covered,weighted_pct:wSum};
 }
 
+const SCORE_BANDS=[
+  {min:80,label:"매우 매력적",cls:"ok",
+   action:"지표상 저평가 신호가 강한 구간입니다. 다만 «싼 데는 이유가 있는» 경우가 많으니, 매수 전에 최근 공시와 업황 악화 여부를 반드시 확인하세요. 확인 후에도 괜찮다면 분할 매수로 접근합니다."},
+  {min:65,label:"매력적",cls:"ok",
+   action:"관심 종목에 담아두고 지켜볼 만한 구간입니다. 한 번에 사기보다 2~3회로 나누어 사고, 재무 건전성 경고가 없는지 함께 확인하세요."},
+  {min:50,label:"보통",cls:"warn",
+   action:"특별히 싸지도 비싸지도 않은 구간입니다. <b>이 점수만으로 매수를 결정하기에는 근거가 부족합니다.</b> 서두를 이유가 없으니 다음 분기 실적을 확인한 뒤 판단해도 늦지 않습니다."},
+  {min:35,label:"신중",cls:"warn",
+   action:"지표상 매력도가 낮은 구간입니다. 신규 매수는 미루고, 보유 중이라면 비중이 과도하지 않은지 점검해보세요."},
+  {min:0,label:"관망",cls:"warn",
+   action:"밸류에이션이 높거나 수익성·성장성이 부진한 구간입니다. 초보 투자자라면 이 구간의 종목은 피하는 편이 안전합니다."}
+];
+
 function totalGrade(total){
-  if(isNil(total)) return {label:"판단 불가",cls:"na"};
-  if(total>=70) return {label:"매력적",cls:"ok"};
-  if(total>=55) return {label:"양호",cls:"ok"};
-  if(total>=40) return {label:"보통",cls:"warn"};
-  return {label:"신중",cls:"warn"};
+  if(isNil(total)) return {label:"판단 불가",cls:"na",
+    action:"지표가 부족해 점수를 산출하지 못했습니다. 재무 데이터가 충분한 다른 종목으로 판단하거나, 공시 원문을 직접 확인하세요."};
+  return SCORE_BANDS.find(b=>total>=b.min)||SCORE_BANDS[SCORE_BANDS.length-1];
 }
 
 /* ---------- 매수/매도 후보 판정 ---------- */
@@ -979,22 +1003,24 @@ function gauge(value,{max,danger,label,foot,decimals=2,lowBad=false}){
     return [cx+r*Math.cos(a), cy-r*Math.sin(a)]; };
   const arc=(f0,f1,color,width)=>{
     const [x0,y0]=pol(f0), [x1,y1]=pol(f1);
-    const large=(f1-f0)>0.5?1:0;
+    const large=0;   // 반원 게이지는 최대 180°이므로 항상 소호(minor arc)
     return `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}"
       fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="butt"/>`;
   };
   const dFrac=Math.min(Math.max(danger/max,0),1);
-  let needle="", val=nil("측정 불가"), valCls="flat";
+  let needle="", val=nil("측정 불가"), valCls="flat", ovf="";
   if(!isNil(value)&&Number.isFinite(value)){
     const f=Math.min(Math.max(value/max,0),1);
     const a=Math.PI*(1-f);
-    const nx=cx+(r-10)*Math.cos(a), ny=cy-(r-10)*Math.sin(a);
+    const nx=cx+(r-14)*Math.cos(a), ny=cy-(r-14)*Math.sin(a);
     const bad = lowBad ? (value<danger) : (value>=danger);
     needle=`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}"
-      stroke="${bad?"var(--up)":"var(--text)"}" stroke-width="2.4" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="3.4" fill="${bad?"var(--up)":"var(--text)"}"/>`;
+      stroke="${bad?"var(--up)":"var(--text)"}" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="3.6" fill="${bad?"var(--up)":"var(--text)"}"/>`;
     val=fmtNum(value,decimals);
     valCls=bad?"up":"";
+    if(value>max) ovf=`<span class="ovf">▲ 눈금 초과</span>`;
+    else if(value<0) ovf=`<span class="ovf">▼ 눈금 미만</span>`;
   }
   const arcs = lowBad
     ? arc(0,dFrac,"var(--up)",9)+arc(dFrac,1,"var(--ok)",9)
@@ -1008,7 +1034,7 @@ function gauge(value,{max,danger,label,foot,decimals=2,lowBad=false}){
       <text x="6" y="${cy+11}" fill="var(--faint)" font-size="9" font-family="var(--mono)">0</text>
       <text x="${W-16}" y="${cy+11}" fill="var(--faint)" font-size="9" font-family="var(--mono)">${max}</text>
     </svg>
-    <div class="val num ${valCls}">${val}</div>
+    <div class="val num ${valCls}">${val}${ovf}</div>
     <div class="foot">${esc(foot||"")}</div>
   </div>`;
 }
@@ -1132,14 +1158,31 @@ function renderScorecard(name,card,signal,mult,roe,growth){
     </div>
     <p class="hint" style="margin:6px 0 10px">가중치 — PER 25% · PBR 20% · ROE 25% · 이익성장률 20% · 과거 밸류에이션 10%. 산출 불가한 지표는 제외하고 남은 지표로 재계산합니다 (현재 ${card.covered}개 지표 반영).</p>
     <div>${rows}</div>
+    ${isNil(card.total)?"":`
+    <div class="bandwrap">
+      <div class="bandbar">
+        <i style="background:var(--up);width:35%"></i>
+        <i style="background:var(--assume);width:30%"></i>
+        <i style="background:var(--ok);width:35%"></i>
+        <span class="bandmark" style="left:${card.total}%"></span>
+      </div>
+      <div class="bandticks"><span>0 관망</span><span>35 신중</span><span>50 보통</span><span>65 매력</span><span>80+</span></div>
+      <div class="edu-verdict lv-${g.cls==="ok"?"ok":"warn"}" style="margin-top:10px">
+        <b>${card.total}점 · ${esc(g.label)}</b> — ${g.action}
+      </div>
+    </div>`}
     <div class="signal sg-${signal.type}" >
       <div class="st">${sgLabel} · ${esc(signal.title)}</div>
       <div class="rs">${esc(signal.reason)}</div>
       <div class="cu">${esc(signal.caution)}</div>
     </div>
-    <div class="edu" style="margin-top:12px">
-      <div class="edu-h">💡 점수는 이렇게 읽으세요</div>
-      <div class="edu-b">이 점수는 "주가가 얼마나 매력적인 가격대인가"를 재무 지표만으로 기계적으로 계산한 값입니다. 70점 이상이면 지표상 매력적, 40점 미만이면 신중할 구간으로 보시면 됩니다. 다만 <b>점수가 높다고 반드시 오르는 것은 아닙니다</b> — 업황, 경영진, 신제품처럼 숫자에 담기지 않는 요소는 반영되지 않습니다.</div>
+    <div class="edu" style="margin-top:12px;border-color:rgba(240,178,71,.5)">
+      <div class="edu-h">⚠️ 점수에 대한 오해 방지</div>
+      <div class="edu-b">
+        <b>50점이 «매수 신호»라는 뜻은 아닙니다.</b> 50점은 «싸지도 비싸지도 않은 평범한 상태»를 의미할 뿐입니다. 이 점수는 합격·불합격을 가르는 시험 점수가 아니라, 가격 매력도를 재는 온도계에 가깝습니다.<br><br>
+        또한 이 점수는 <b>가격이 싼가</b>만 봅니다. 회사가 앞으로도 잘될 것인지(업황·경쟁력·경영진), 지금이 살 타이밍인지(시장 흐름)는 <b>전혀 반영하지 않습니다.</b> 점수가 90점이어도 사양산업이면 계속 내려갈 수 있고, 40점이어도 성장하는 기업이면 오를 수 있습니다.<br><br>
+        따라서 점수는 <b>«후보를 추리는 1차 필터»</b>로만 쓰시고, 실제 매수 여부는 아래 매수·매도 신호와 재무 적신호, 최근 공시를 함께 확인한 뒤 결정하세요.
+      </div>
     </div>`;
   return sec;
 }

@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" fill="#0E141B"/>
+  <g transform="translate(4, 8)">
+    <!-- Chart area -->
+    <rect x="0" y="6" width="24" height="10" fill="none" stroke="#5B9BFF" stroke-width="1.5" rx="1.5"/>
+    <!-- Up line (red) -->
+    <polyline points="2,12 6,10 10,11 14,8 18,10 22,6" stroke="#FF6B74" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Down line (blue) -->
+    <polyline points="2,14 6,13 10,14 14,12 18,13 22,12" stroke="#5B9BFF" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Text K -->
+    <text x="12" y="2" font-family="sans-serif" font-size="6" font-weight="bold" fill="#F6FAFF" text-anchor="middle">K</text>
+  </g>
+</svg>

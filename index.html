@@ -105,6 +105,44 @@ body{
 .synth-list{margin:0;padding-left:19px;font-size:14px;color:var(--text);line-height:1.65}
 .synth-list li{margin-bottom:7px}
 
+/* ---------- 한 줄 요약 · 신호 배너 ---------- */
+.oneline{font-size:16.5px;font-weight:700;line-height:1.6;color:var(--text);margin:0 0 14px}
+.signal{border:1px solid;border-radius:12px;padding:14px 16px;margin-top:12px}
+.signal .st{font-size:14px;font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.signal .rs{font-size:14px;color:var(--text);margin-top:8px;line-height:1.65;opacity:.94}
+.signal .cu{font-size:13.5px;color:var(--muted);margin-top:9px;line-height:1.6;
+  padding-top:9px;border-top:1px dashed var(--line)}
+.signal.sg-buy{border-color:rgba(79,203,147,.6);background:rgba(79,203,147,.1)}
+.signal.sg-buy .st{color:var(--ok)}
+.signal.sg-sell{border-color:rgba(255,107,116,.6);background:rgba(255,107,116,.1)}
+.signal.sg-sell .st{color:var(--up)}
+.signal.sg-neutral{border-color:var(--line);background:var(--surface2)}
+.signal.sg-neutral .st{color:var(--muted)}
+
+/* ---------- 점수 막대 ---------- */
+.total-score{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.total-score .n{font-size:44px;font-weight:800;line-height:1;font-family:var(--mono)}
+.total-score .u{font-size:16px;color:var(--muted);font-weight:600}
+.total-score .g{font-size:14px;font-weight:800;padding:4px 12px;border-radius:99px;border:1px solid}
+.total-score .g.ok{color:var(--ok);border-color:rgba(79,203,147,.5);background:rgba(79,203,147,.12)}
+.total-score .g.warn{color:var(--assume);border-color:rgba(240,178,71,.5);background:rgba(240,178,71,.12)}
+.total-score .g.na{color:var(--na);border-color:var(--line)}
+.srow{display:grid;grid-template-columns:minmax(120px,1.3fr) minmax(70px,.7fr) 1fr auto;
+  gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.srow:last-child{border-bottom:0}
+.srow .sk{font-size:13.5px;font-weight:700;color:var(--text)}
+.srow .sk small{display:block;font-weight:500;font-size:12px;color:var(--muted);margin-top:2px}
+.srow .sv{font-size:14px;font-family:var(--mono);color:var(--text);text-align:right}
+.sbar{height:9px;background:var(--surface2);border-radius:99px;overflow:hidden;min-width:60px}
+.sbar i{display:block;height:100%;border-radius:99px}
+.srow .sp{font-size:14.5px;font-weight:800;font-family:var(--mono);min-width:44px;text-align:right}
+.srow.na .sk,.srow.na .sv,.srow.na .sp{color:var(--faint)}
+@media (max-width:560px){
+  .srow{grid-template-columns:1fr auto;row-gap:6px}
+  .srow .sbar{grid-column:1/2}
+  .srow .sv{text-align:left;grid-column:1/3}
+}
+
 /* ---------- 종합 정리 카드 ---------- */
 .verdict-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
 .verdict-item{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface2)}
@@ -387,6 +425,140 @@ function interpretPBR(pbr,note){
     text:`PBR ${fmtNum(pbr,2)}배는 흔히 보는 평균적인 수준입니다.`};
   return {level:"높음",
     text:`PBR ${fmtNum(pbr,2)}배는 순자산 대비 주가가 높게 형성돼 있다는 뜻입니다. 성장성이나 브랜드력에 대한 프리미엄이 반영된 경우가 많지만, 그만큼 기대가 꺾이면 하락 폭도 클 수 있습니다.`};
+}
+
+function interpretROE(roe){
+  if(isNil(roe)) return {level:"정보없음",text:""};
+  if(roe<0) return {level:"주의",
+    text:`ROE ${fmtNum(roe,1)}%로 마이너스입니다. 주주가 맡긴 자본으로 오히려 손실을 내고 있다는 뜻으로, 수익성에 문제가 있는 상태입니다.`};
+  if(roe<5) return {level:"낮음",
+    text:`ROE ${fmtNum(roe,1)}%는 낮은 편입니다. 은행 예금이나 채권 금리와 비교해도 자본을 효율적으로 굴리지 못하고 있다고 볼 수 있습니다.`};
+  if(roe<10) return {level:"보통",
+    text:`ROE ${fmtNum(roe,1)}%는 평범한 수준입니다. 나쁘지는 않지만 뛰어난 수익성이라고 보기도 어렵습니다.`};
+  if(roe<20) return {level:"양호",
+    text:`ROE ${fmtNum(roe,1)}%는 양호합니다. 주주 자본을 효율적으로 활용해 이익을 내고 있다는 뜻이며, 워런 버핏이 오랫동안 중시해온 지표이기도 합니다.`};
+  return {level:"우수",
+    text:`ROE ${fmtNum(roe,1)}%는 매우 높은 수준입니다. 다만 빚을 많이 써서 ROE가 부풀려진 경우도 있으니 부채비율을 함께 확인하세요.`};
+}
+
+/* ---------- 지표 점수화 엔진 (0~100, 높을수록 투자 매력) ---------- */
+const clamp100=x=>Math.max(0,Math.min(100,x));
+
+function scorePER(per,note){
+  if(note||isNil(per)||per<=0) return {score:null,note:note||"산출 불가"};
+  if(per<=5) return {score:100,note:"매우 저평가 구간"};
+  const s=clamp100(100-(per-5)*4);   // PER 5 → 100점, PER 30 → 0점
+  return {score:pyRound(s,0),note:per<10?"저평가 구간":(per<=20?"평균 구간":"고평가 구간")};
+}
+function scorePBR(pbr,note){
+  if(note||isNil(pbr)||pbr<=0) return {score:null,note:note||"산출 불가"};
+  if(pbr<=0.5) return {score:100,note:"순자산 대비 크게 할인"};
+  const s=clamp100(100-(pbr-0.5)*40); // PBR 0.5 → 100점, PBR 3.0 → 0점
+  return {score:pyRound(s,0),note:pbr<1?"순자산 이하 거래":(pbr<=3?"평균 구간":"고평가 구간")};
+}
+function scoreROE(roe){
+  if(isNil(roe)) return {score:null,note:"산출 불가"};
+  const s=clamp100(roe*4);            // ROE 25% → 100점, 0% → 0점
+  return {score:pyRound(s,0),
+    note:roe>=20?"수익성 우수":(roe>=15?"수익성 우수":(roe>=10?"수익성 양호":(roe>=5?"수익성 보통":"수익성 미흡")))};
+}
+function scoreGrowth(cagr){
+  if(isNil(cagr)) return {score:null,note:"산출 불가"};
+  const s=clamp100((cagr+20)*2.5);    // -20% → 0점, +20% → 100점
+  return {score:pyRound(s,0),note:cagr>=10?"고성장":(cagr>0?"완만한 성장":"역성장")};
+}
+/* 과거 밸류에이션: 최근 1년 주가 밴드 내 현재가 위치 (낮을수록 저렴) */
+function scoreHistorical(price,low52,high52){
+  if(isNil(price)||isNil(low52)||isNil(high52)||high52<=low52)
+    return {score:null,note:"52주 밴드 데이터 부족"};
+  const posPct=(price-low52)/(high52-low52)*100;
+  const s=clamp100(100-posPct);
+  return {score:pyRound(s,0),
+    note:`52주 밴드 하단에서 ${fmtNum(posPct,0)}% 지점`,pos:pyRound(posPct,0)};
+}
+
+const SCORE_WEIGHTS={per:25,pbr:20,roe:25,growth:20,hist:10};
+
+function buildScorecard({mult,roe,growth,quote}){
+  const items=[
+    {key:"per",label:"PER (주가수익비율)",
+     value:isNil(mult.per)?null:`${fmtNum(mult.per,2)}배`,...scorePER(mult.per,mult.per_note)},
+    {key:"pbr",label:"PBR (주가순자산비율)",
+     value:isNil(mult.pbr)?null:`${fmtNum(mult.pbr,2)}배`,...scorePBR(mult.pbr,mult.pbr_note)},
+    {key:"roe",label:"ROE (자기자본이익률)",
+     value:isNil(roe)?null:`${fmtNum(roe,1)}%`,...scoreROE(roe)},
+    {key:"growth",label:"이익 성장률 (순이익 CAGR)",
+     value:isNil(growth.net_income_cagr_pct)?null:`연 ${fmtNum(growth.net_income_cagr_pct,1)}%`,
+     ...scoreGrowth(growth.net_income_cagr_pct)},
+    {key:"hist",label:"과거 밸류에이션 (52주 밴드)",
+     value:isNil(quote.price)?null:`${fmtNum(quote.price)}원`,
+     ...scoreHistorical(quote.price,quote.low_52w,quote.high_52w)},
+    {key:"sector",label:"업종 평균 대비",value:null,score:null,
+     note:"DART·시세만으로는 업종 평균을 산출할 수 없어 점수에서 제외했습니다"}
+  ];
+  let wSum=0,sSum=0;
+  for(const it of items){
+    const w=SCORE_WEIGHTS[it.key];
+    if(!w||isNil(it.score)) continue;
+    wSum+=w; sSum+=it.score*w;
+  }
+  const total=wSum?pyRound(sSum/wSum,0):null;
+  const covered=items.filter(i=>SCORE_WEIGHTS[i.key]&&!isNil(i.score)).length;
+  return {items,total,covered,weighted_pct:wSum};
+}
+
+function totalGrade(total){
+  if(isNil(total)) return {label:"판단 불가",cls:"na"};
+  if(total>=70) return {label:"매력적",cls:"ok"};
+  if(total>=55) return {label:"양호",cls:"ok"};
+  if(total>=40) return {label:"보통",cls:"warn"};
+  return {label:"신중",cls:"warn"};
+}
+
+/* ---------- 매수/매도 후보 판정 ---------- */
+function detectSignal({mult,roe,growth,recentYoY}){
+  const per=mult.per, pbr=mult.pbr, g=growth.net_income_cagr_pct;
+  const have=v=>!isNil(v);
+
+  // 이익 증가 둔화: 최근 1년 증가율이 과거 평균보다 낮음
+  const slowing = have(recentYoY)&&have(g) ? recentYoY < g : null;
+
+  if(have(per)&&have(pbr)&&have(roe)&&have(g)&&
+     per<10 && pbr<1 && roe>=15 && g>0){
+    return {type:"buy",title:"매수 후보 조건 충족",
+      reason:`PER ${fmtNum(per,2)}배(10배 미만) · PBR ${fmtNum(pbr,2)}배(1배 미만) · ROE ${fmtNum(roe,1)}%(15% 이상) · 순이익 연 ${fmtNum(g,1)}% 증가 — 네 가지 조건을 모두 만족합니다. 자산과 이익 대비 주가가 낮으면서도 수익성과 성장이 함께 확인되는, 이른바 '싸고 좋은 회사'의 전형적인 형태입니다.`,
+      caution:"다만 저평가에는 이유가 있는 경우도 많습니다. 업황 악화, 지배구조 문제, 일회성 이익 등이 숨어 있지 않은지 최근 공시와 사업보고서를 반드시 확인한 뒤 판단하세요."};
+  }
+  if(have(per)&&have(pbr)&&per>20&&pbr>3&&slowing===true){
+    return {type:"sell",title:"매도 검토 조건 충족",
+      reason:`PER ${fmtNum(per,2)}배(20배 초과) · PBR ${fmtNum(pbr,2)}배(3배 초과)로 밸류에이션이 높은 상태에서, 최근 1년 순이익 증가율(${fmtNum(recentYoY,1)}%)이 과거 평균 성장률(연 ${fmtNum(g,1)}%)보다 낮아졌습니다. 높은 주가를 정당화하던 성장 속도가 꺾이는 신호일 수 있습니다.`,
+      caution:"성장 둔화가 일시적인지 구조적인지에 따라 해석이 완전히 달라집니다. 보유 중이라면 전량 매도보다 비중 조절을 먼저 고려하고, 다음 분기 실적을 확인하는 것도 방법입니다."};
+  }
+  const parts=[];
+  if(have(per)) parts.push(`PER ${fmtNum(per,2)}배`);
+  if(have(pbr)) parts.push(`PBR ${fmtNum(pbr,2)}배`);
+  if(have(roe)) parts.push(`ROE ${fmtNum(roe,1)}%`);
+  return {type:"neutral",title:"뚜렷한 매수·매도 신호 없음",
+    reason:parts.length
+      ? `${parts.join(" · ")} 기준으로는 매수 후보(저PER+저PBR+고ROE+이익증가) 조건도, 매도 검토(고PER+고PBR+성장둔화) 조건도 모두 충족하지 않습니다.`
+      : "판정에 필요한 지표가 부족해 신호를 산출하지 못했습니다.",
+    caution:"신호가 없다는 것은 '지금은 서두를 이유가 없다'는 뜻에 가깝습니다. 초보 투자자라면 조건이 명확해질 때까지 기다리는 것도 좋은 선택입니다."};
+}
+
+/* ---------- 한 줄 요약 생성 ---------- */
+function oneLineSummary(name,card,signal,mult,roe,growth){
+  const g=totalGrade(card.total);
+  const bits=[];
+  if(!isNil(mult.per)) bits.push(`PER ${fmtNum(mult.per,1)}배`);
+  if(!isNil(mult.pbr)) bits.push(`PBR ${fmtNum(mult.pbr,2)}배`);
+  if(!isNil(roe)) bits.push(`ROE ${fmtNum(roe,1)}%`);
+  if(!isNil(growth.net_income_cagr_pct)) bits.push(`순이익 연 ${fmtNum(growth.net_income_cagr_pct,1)}%`);
+  const tail = signal.type==="buy" ? "매수 후보 조건을 충족한 구간입니다"
+    : signal.type==="sell" ? "매도 검토 조건에 해당하는 구간입니다"
+    : "매수·매도 어느 쪽으로도 뚜렷한 신호는 없는 구간입니다";
+  const head = isNil(card.total) ? `${name}은(는) 지표가 부족해 종합 점수를 산출하지 못했으며`
+    : `${name}은(는) 종합 ${card.total}점(${g.label})으로`;
+  return `${head}, ${bits.join(" · ")} 기준 ${tail}.`;
 }
 
 /* 재무제표 종합의견: 장점 / 우려 / 주의사항 */
@@ -801,7 +973,7 @@ function sparkline(values,w=104,h=26){
 }
 
 /* 반원 게이지 — 위험구간을 적색 호로 표시 */
-function gauge(value,{max,danger,label,foot,decimals=2}){
+function gauge(value,{max,danger,label,foot,decimals=2,lowBad=false}){
   const W=170,H=96,cx=85,cy=84,r=64;
   const pol=(frac)=>{ const a=Math.PI*(1-Math.min(Math.max(frac,0),1));
     return [cx+r*Math.cos(a), cy-r*Math.sin(a)]; };
@@ -811,25 +983,27 @@ function gauge(value,{max,danger,label,foot,decimals=2}){
     return `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}"
       fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="butt"/>`;
   };
-  const dFrac=Math.min(danger/max,1);
+  const dFrac=Math.min(Math.max(danger/max,0),1);
   let needle="", val=nil("측정 불가"), valCls="flat";
   if(!isNil(value)&&Number.isFinite(value)){
     const f=Math.min(Math.max(value/max,0),1);
     const a=Math.PI*(1-f);
     const nx=cx+(r-10)*Math.cos(a), ny=cy-(r-10)*Math.sin(a);
-    const over=value>=danger;
+    const bad = lowBad ? (value<danger) : (value>=danger);
     needle=`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}"
-      stroke="${over?"var(--up)":"var(--text)"}" stroke-width="2.4" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="3.4" fill="${over?"var(--up)":"var(--text)"}"/>`;
+      stroke="${bad?"var(--up)":"var(--text)"}" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="3.4" fill="${bad?"var(--up)":"var(--text)"}"/>`;
     val=fmtNum(value,decimals);
-    valCls=over?"up":"";
+    valCls=bad?"up":"";
   }
+  const arcs = lowBad
+    ? arc(0,dFrac,"var(--up)",9)+arc(dFrac,1,"var(--ok)",9)
+    : arc(0,dFrac,"var(--line)",9)+arc(dFrac,1,"var(--up)",9);
   return `<div class="gauge">
     <div class="label">${esc(label)}</div>
     <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
          aria-label="${esc(label)} ${isNil(value)?"측정 불가":value}">
-      ${arc(0,dFrac,"var(--line)",9)}
-      ${arc(dFrac,1,"var(--up)",9)}
+      ${arcs}
       ${needle}
       <text x="6" y="${cy+11}" fill="var(--faint)" font-size="9" font-family="var(--mono)">0</text>
       <text x="${W-16}" y="${cy+11}" fill="var(--faint)" font-size="9" font-family="var(--mono)">${max}</text>
@@ -888,34 +1062,86 @@ function renderQuote(info){
   return card;
 }
 
-function renderGauges(mult,basis){
+function renderGauges(mult,basis,roe,roeYear){
   const card=el("section","card");
   const perFoot=mult.per_note||`EPS ${fmtNum(basis.eps)}원 기준`;
   const pbrFoot=mult.pbr_note||`BPS ${fmtNum(basis.bps)}원 기준`;
+  const roeFoot=isNil(roe)?"자본총계·순이익 데이터 부족":`${roeYear}년 순이익 ÷ 자본총계`;
   const perI=interpretPER(mult.per,mult.per_note);
   const pbrI=interpretPBR(mult.pbr,mult.pbr_note);
+  const roeI=interpretROE(roe);
   card.innerHTML=`
-    <h2>밸류에이션 멀티플</h2>
-    <p class="hint">붉은 호는 통상적 고평가 구간입니다. 업종별 적정 수준은 다르므로 절대 기준이 아닙니다.</p>
+    <h2>밸류에이션 멀티플 · 수익성</h2>
+    <p class="hint">PER·PBR은 붉은 호가 통상적 고평가 구간, ROE는 붉은 호가 수익성 미흡 구간입니다. 업종별 적정 수준은 다르므로 절대 기준이 아닙니다.</p>
     <div class="gauges">
       ${gauge(mult.per,{max:40,danger:25,label:"PER (주가수익비율)",foot:perFoot})}
       ${gauge(mult.pbr,{max:5,danger:3,label:"PBR (주가순자산비율)",foot:pbrFoot})}
+      ${gauge(roe,{max:30,danger:8,label:"ROE (자기자본이익률)",foot:roeFoot,decimals:1,lowBad:true})}
     </div>
     <div class="edu-grid">
       <div class="edu">
         <div class="edu-h">💡 PER이란?</div>
-        <div class="edu-b">현재 주가가 1주당 순이익(EPS)의 몇 배인지를 나타냅니다. "지금 버는 이익 속도로 몇 년이면 투자금을 회수할 수 있을까"를 대략 가늠하는 지표라고 이해하면 쉽습니다.</div>
+        <div class="edu-b">현재 주가가 1주당 순이익(EPS)의 몇 배인지를 나타냅니다. "지금 버는 이익 속도로 몇 년이면 투자금을 회수할 수 있을까"를 대략 가늠하는 지표라고 이해하면 쉽습니다. <b>낮을수록</b> 이익 대비 주가가 싸다는 뜻입니다.</div>
         ${perI.text?`<div class="edu-verdict lv-${levelClass(perI.level)}">${esc(perI.level)} — ${esc(perI.text)}</div>`:""}
       </div>
       <div class="edu">
         <div class="edu-h">💡 PBR이란?</div>
-        <div class="edu-b">현재 주가가 1주당 순자산(BPS, 회사를 지금 청산했을 때 주주가 가져갈 몫)의 몇 배인지를 나타냅니다.</div>
+        <div class="edu-b">현재 주가가 1주당 순자산(BPS, 회사를 지금 청산했을 때 주주가 가져갈 몫)의 몇 배인지를 나타냅니다. <b>낮을수록</b> 자산 대비 주가가 싸다는 뜻입니다.</div>
         ${pbrI.text?`<div class="edu-verdict lv-${levelClass(pbrI.level)}">${esc(pbrI.level)} — ${esc(pbrI.text)}</div>`:""}
+      </div>
+      <div class="edu">
+        <div class="edu-h">💡 ROE란?</div>
+        <div class="edu-b">주주가 낸 돈(자기자본)으로 1년에 몇 %의 이익을 냈는지를 보여주는 <b>수익성</b> 지표입니다. PER·PBR이 "얼마나 싼가"를 본다면 ROE는 "얼마나 잘 버는가"를 봅니다. 통상 <b>10% 이상</b>이면 양호, <b>15% 이상</b>이면 우수하다고 봅니다.</div>
+        ${roeI.text?`<div class="edu-verdict lv-${levelClass(roeI.level)}">${esc(roeI.level)} — ${esc(roeI.text)}</div>`:""}
       </div>
     </div>
     <p class="hint" style="margin:12px 0 0">${esc(basis.eps_source)} · 재무제표 기준 ${
       basis.statement_basis==="CFS"?"연결(CFS)":"별도(OFS)"}</p>`;
   return card;
+}
+
+/* ---------- 한 줄 요약 + 점수표 + 매수/매도 신호 ---------- */
+function renderScorecard(name,card,signal,mult,roe,growth){
+  const sec=el("section","card");
+  const g=totalGrade(card.total);
+  const barColor=s=>s>=70?"var(--ok)":(s>=40?"var(--assume)":"var(--up)");
+
+  const rows=card.items.map(it=>{
+    if(isNil(it.score)) return `<div class="srow na">
+      <div class="sk">${esc(it.label)}<small>${esc(it.note||"")}</small></div>
+      <div class="sv">${it.value?esc(it.value):"없음"}</div>
+      <div class="sbar"><i style="width:0"></i></div>
+      <div class="sp">—</div></div>`;
+    return `<div class="srow">
+      <div class="sk">${esc(it.label)}<small>${esc(it.note||"")}</small></div>
+      <div class="sv">${it.value?esc(it.value):""}</div>
+      <div class="sbar"><i style="width:${it.score}%;background:${barColor(it.score)}"></i></div>
+      <div class="sp" style="color:${barColor(it.score)}">${it.score}</div></div>`;
+  }).join("");
+
+  const sgLabel={buy:"🟢 매수 후보",sell:"🔴 매도 검토",neutral:"⚪ 중립"}[signal.type];
+
+  sec.innerHTML=`
+    <h2>한 줄 요약 · 지표 점수</h2>
+    <p class="oneline">${esc(oneLineSummary(name,card,signal,mult,roe,growth))}</p>
+    <div class="total-score">
+      <span class="n" style="color:${isNil(card.total)?"var(--faint)":barColor(card.total)}">${
+        isNil(card.total)?"—":card.total}</span>
+      <span class="u">/ 100점</span>
+      <span class="g ${g.cls}">${esc(g.label)}</span>
+    </div>
+    <p class="hint" style="margin:6px 0 10px">가중치 — PER 25% · PBR 20% · ROE 25% · 이익성장률 20% · 과거 밸류에이션 10%. 산출 불가한 지표는 제외하고 남은 지표로 재계산합니다 (현재 ${card.covered}개 지표 반영).</p>
+    <div>${rows}</div>
+    <div class="signal sg-${signal.type}" >
+      <div class="st">${sgLabel} · ${esc(signal.title)}</div>
+      <div class="rs">${esc(signal.reason)}</div>
+      <div class="cu">${esc(signal.caution)}</div>
+    </div>
+    <div class="edu" style="margin-top:12px">
+      <div class="edu-h">💡 점수는 이렇게 읽으세요</div>
+      <div class="edu-b">이 점수는 "주가가 얼마나 매력적인 가격대인가"를 재무 지표만으로 기계적으로 계산한 값입니다. 70점 이상이면 지표상 매력적, 40점 미만이면 신중할 구간으로 보시면 됩니다. 다만 <b>점수가 높다고 반드시 오르는 것은 아닙니다</b> — 업황, 경영진, 신제품처럼 숫자에 담기지 않는 요소는 반영되지 않습니다.</div>
+    </div>`;
+  return sec;
 }
 
 function renderFinancials(years,growth,synth){
@@ -1087,7 +1313,7 @@ function renderRisk(result,disclosures,days){
   return card;
 }
 
-function renderVerdict(mult,sv,price,synth,risk,growth){
+function renderVerdict(mult,sv,price,synth,risk,growth,roe,scorecard,signal){
   const card=el("section","card");
   const triggered=risk.flags.filter(f=>f.triggered).length;
   const checked=risk.checked_count;
@@ -1098,6 +1324,14 @@ function renderVerdict(mult,sv,price,synth,risk,growth){
     else if(mult.per<=20){valLabel="평균적인 수준";valCls="ok";}
     else {valLabel="고평가 신호 · 고성장 기대 반영";valCls="warn";}
   } else if(mult.per_note){ valLabel="적자로 산출 불가"; valCls="warn"; }
+
+  let roeLabel="정보 부족", roeCls="na";
+  if(!isNil(roe)){
+    if(roe>=15){roeLabel=`ROE ${fmtNum(roe,1)}% · 수익성 우수`;roeCls="ok";}
+    else if(roe>=10){roeLabel=`ROE ${fmtNum(roe,1)}% · 양호`;roeCls="ok";}
+    else if(roe>=5){roeLabel=`ROE ${fmtNum(roe,1)}% · 보통`;roeCls="warn";}
+    else {roeLabel=`ROE ${fmtNum(roe,1)}% · 미흡`;roeCls="warn";}
+  }
 
   let finLabel="정보 부족", finCls="na";
   if(checked>0){
@@ -1124,23 +1358,38 @@ function renderVerdict(mult,sv,price,synth,risk,growth){
   const allPros=[...synth.pros];
   const allCons=[...synth.cons, ...risk.flags.filter(f=>f.triggered).map(f=>f.description)];
   const allCautions=[...synth.cautions];
+  if(!isNil(roe)){
+    if(roe>=15) allPros.push(`ROE가 ${fmtNum(roe,1)}%로 높습니다. 주주 자본을 효율적으로 굴려 이익을 내고 있다는 뜻입니다.`);
+    else if(roe<5) allCons.push(`ROE가 ${fmtNum(roe,1)}%로 낮습니다. 자본 대비 수익성이 떨어집니다.`);
+  }
+
+  const sgLine={
+    buy:"현재 지표 조합은 <b>매수 후보</b> 조건에 해당합니다. 다만 이 조건을 만족하는 종목이라도 반드시 오르는 것은 아니므로, 소액으로 나누어 접근하고 최근 공시를 함께 확인하세요.",
+    sell:"현재 지표 조합은 <b>매도 검토</b> 조건에 해당합니다. 보유 중이라면 전량 정리보다 비중 축소를 먼저 고려하고, 신규 진입은 서두르지 않는 편이 안전합니다.",
+    neutral:"현재는 매수·매도 어느 쪽으로도 <b>뚜렷한 신호가 없습니다</b>. 관심 종목으로 담아두고 분기 실적을 지켜보는 것도 좋은 방법입니다."
+  }[signal?signal.type:"neutral"];
+
+  const g=scorecard?totalGrade(scorecard.total):null;
 
   card.innerHTML=`
     <h2>종합 정리 · 투자 판단 체크리스트</h2>
     <p class="hint">위에서 살펴본 내용을 한눈에 정리했습니다. 이 카드는 매수·매도를 대신 결정해 드리지 않습니다 — 최종 판단은 반드시 본인의 몫입니다.</p>
     <div class="verdict-grid">
       <div class="verdict-item ${valCls}"><div class="vi-k">밸류에이션</div><div class="vi-v">${esc(valLabel)}</div></div>
+      <div class="verdict-item ${roeCls}"><div class="vi-k">수익성 (ROE)</div><div class="vi-v">${esc(roeLabel)}</div></div>
       <div class="verdict-item ${finCls}"><div class="vi-k">재무 건전성</div><div class="vi-v">${esc(finLabel)}</div></div>
       <div class="verdict-item ${growCls}"><div class="vi-k">성장성</div><div class="vi-v">${esc(growLabel)}</div></div>
       <div class="verdict-item ${posCls}"><div class="vi-k">현재가 위치</div><div class="vi-v">${esc(posLabel)}</div></div>
+      ${scorecard&&!isNil(scorecard.total)?`<div class="verdict-item ${g.cls}">
+        <div class="vi-k">종합 점수</div><div class="vi-v">${scorecard.total}점 · ${esc(g.label)}</div></div>`:""}
     </div>
     ${synthBlock({pros:allPros,cons:allCons,cautions:allCautions})}
     <div class="edu" style="margin-top:14px;border-color:rgba(240,178,71,.5)">
       <div class="edu-h">💡 초보자를 위한 조언</div>
       <div class="edu-b">
-        어느 한 지표만 보고 판단하지 마세요. 위 4가지(밸류에이션 · 재무건전성 · 성장성 · 현재가 위치)를 함께 고려하는 것이 좋습니다.<br><br>
-        "저평가"라는 신호가 있어도 재무 건전성 경고가 여러 건이라면 신중해야 하고, 반대로 재무가 튼튼해도 이미 낙관적 기대가 주가에 반영돼 있다면 추가 상승 여력이 제한적일 수 있습니다.<br><br>
-        하나의 종목에 모든 돈을 넣지 말고, 잃어도 괜찮은 범위 안에서, 본인이 이해할 수 있는 회사에 투자하는 것이 초보 투자자에게 특히 중요합니다.<br><br>
+        ${sgLine}<br><br>
+        어느 한 지표만 보고 판단하지 마세요. 위 항목들(밸류에이션 · 수익성 · 재무건전성 · 성장성 · 현재가 위치)을 함께 고려하는 것이 좋습니다. <b>PER·PBR이 낮아도 ROE가 낮으면</b> 싼 데는 이유가 있는 경우가 많고, 반대로 <b>ROE가 높아도 PER·PBR이 너무 높으면</b> 좋은 회사를 비싸게 사는 셈이 됩니다.<br><br>
+        하나의 종목에 모든 돈을 넣지 말고, 잃어도 괜찮은 범위 안에서, 본인이 이해할 수 있는 회사에 투자하는 것이 초보 투자자에게 특히 중요합니다. 한 번에 사지 말고 여러 번에 나누어 사는 분할 매수도 위험을 줄이는 방법입니다.<br><br>
         이 화면은 DART 공시와 시세를 기계적으로 계산한 참고 자료이며, 투자 자문이나 매수·매도 추천이 아닙니다. 실제 투자 결정 전에는 최근 공시 원문을 직접 확인하고, 필요하다면 전문가와 상담하시길 권합니다.
       </div>
     </div>`;
@@ -1202,13 +1451,23 @@ async function analyze(ticker,name){
     const risk=evaluateFinancialFlags(years);
     const synth=synthesizeFinancials(enriched,growth);
 
+    // ROE (최신 결산연도) · 최근 1년 순이익 증가율
+    const roe=enriched[enriched.length-1].ratios.roe_pct;
+    const prevY=years.length>=2?years[years.length-2]:null;
+    const recentYoY=(prevY&&!isNil(prevY.net_income)&&prevY.net_income>0&&!isNil(last.net_income))
+      ? pyRound((last.net_income/prevY.net_income-1)*100,2) : null;
+
+    const scorecard=buildScorecard({mult,roe,growth,quote});
+    const signal=detectSignal({mult,roe,growth,recentYoY});
+
     setStatus("");
     $out.appendChild(renderQuote({name:corpName,ticker,quote,shares:sharesInfo,capCheck}));
-    $out.appendChild(renderGauges(mult,basis));
+    $out.appendChild(renderScorecard(corpName,scorecard,signal,mult,roe,growth));
+    $out.appendChild(renderGauges(mult,basis,roe,last.year));
     $out.appendChild(renderFinancials(enriched,growth,synth));
     $out.appendChild(renderScenarios(sv,quote.price));
     $out.appendChild(renderRisk(risk,disclosures,90));
-    $out.appendChild(renderVerdict(mult,sv,quote.price,synth,risk,growth));
+    $out.appendChild(renderVerdict(mult,sv,quote.price,synth,risk,growth,roe,scorecard,signal));
     location.hash=ticker;
   }catch(e){
     setStatus(`<b>분석하지 못했습니다.</b><br>${esc(e.message)}`,"note err");

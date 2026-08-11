@@ -17,40 +17,109 @@ const toNum = s => {
   return Number.isFinite(n) ? n : null;
 };
 
-async function fetchUniverse() {
-  const KRX_URL = 'http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd';
-  const HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'Referer': 'http://data.krx.co.kr/',
-    'Accept': 'application/json, text/javascript, */*',
-  };
-  const kst = new Date(Date.now() + 9 * 3600 * 1000);
-  const day = kst.getUTCDay();
-  if (day === 0) kst.setUTCDate(kst.getUTCDate() - 2);
-  else if (day === 6) kst.setUTCDate(kst.getUTCDate() - 1);
-  const trdDd = kst.toISOString().slice(0, 10).replace(/-/g, '');
-  const items = [];
-  for (const [mktId, market] of [['STK','KOSPI'],['KSQ','KOSDAQ']]) {
-    const body = new URLSearchParams({ bld: 'dbms/MDC/STAT/standard/MDCSTAT01501', locale: 'ko_KR', mktId, trdDd, share: '1', money: '1', csvxls_isNo: 'false' });
-    try {
-      const res = await fetch(KRX_URL, { method: 'POST', headers: HEADERS, body });
-      if (!res.ok) { console.warn(`  KRX ${market} ${res.status} — 건너뜀`); continue; }
-      const json = await res.json();
-      const rows = (json.OutBlock_1 || []).filter(r => r.MKT_ID !== 'KNX');
-      for (const r of rows) {
-        const cap = toNum(r.MKTCAP), price = toNum(r.TDD_CLSPRC);
-        if (!r.ISU_SRT_CD || !price || !cap) continue;
-        items.push({ code: r.ISU_SRT_CD.trim(), name: (r.ISU_ABBRV||'').trim(), market, sector: (r.IDX_IND_NM||'').trim()||null, price, changePct: toNum(r.FLUC_RT), marketCap: cap });
-      }
-      console.log(`  ${market}: ${rows.length}종목`);
-    } catch(e) { console.warn(`  KRX ${market} 실패: ${e.message}`); }
-  }
-  if (!items.length) throw new Error('KRX 종목 없음');
-  const kospi = items.filter(i=>i.market==='KOSPI').sort((a,b)=>b.marketCap-a.marketCap).slice(0,200);
-  const kosdaq = items.filter(i=>i.market==='KOSDAQ').sort((a,b)=>b.marketCap-a.marketCap).slice(0,150);
-  return { items: [...kospi,...kosdaq], trade_date: `${trdDd.slice(0,4)}-${trdDd.slice(4,6)}-${trdDd.slice(6,8)}` };
-}
+// KOSPI200 + KOSDAQ150 주요 종목 하드코딩 (KRX API 대체)
+const UNIVERSE = [
+  {code:'005930',name:'삼성전자',market:'KOSPI',sector:'반도체'},
+  {code:'000660',name:'SK하이닉스',market:'KOSPI',sector:'반도체'},
+  {code:'005380',name:'현대차',market:'KOSPI',sector:'자동차'},
+  {code:'000270',name:'기아',market:'KOSPI',sector:'자동차'},
+  {code:'035420',name:'NAVER',market:'KOSPI',sector:'IT서비스'},
+  {code:'035720',name:'카카오',market:'KOSPI',sector:'IT서비스'},
+  {code:'207940',name:'삼성바이오로직스',market:'KOSPI',sector:'바이오'},
+  {code:'068270',name:'셀트리온',market:'KOSPI',sector:'바이오'},
+  {code:'051910',name:'LG화학',market:'KOSPI',sector:'화학'},
+  {code:'006400',name:'삼성SDI',market:'KOSPI',sector:'2차전지'},
+  {code:'247540',name:'에코프로비엠',market:'KOSDAQ',sector:'2차전지'},
+  {code:'086520',name:'에코프로',market:'KOSDAQ',sector:'2차전지'},
+  {code:'096770',name:'SK이노베이션',market:'KOSPI',sector:'화학'},
+  {code:'034020',name:'두산에너빌리티',market:'KOSPI',sector:'기계'},
+  {code:'015760',name:'한국전력',market:'KOSPI',sector:'에너지'},
+  {code:'032830',name:'삼성생명',market:'KOSPI',sector:'금융'},
+  {code:'055550',name:'신한지주',market:'KOSPI',sector:'금융'},
+  {code:'105560',name:'KB금융',market:'KOSPI',sector:'금융'},
+  {code:'086790',name:'하나금융지주',market:'KOSPI',sector:'금융'},
+  {code:'316140',name:'우리금융지주',market:'KOSPI',sector:'금융'},
+  {code:'003550',name:'LG',market:'KOSPI',sector:'지주'},
+  {code:'066570',name:'LG전자',market:'KOSPI',sector:'가전'},
+  {code:'009540',name:'HD한국조선해양',market:'KOSPI',sector:'조선'},
+  {code:'010140',name:'삼성중공업',market:'KOSPI',sector:'조선'},
+  {code:'042660',name:'한화오션',market:'KOSPI',sector:'조선'},
+  {code:'011200',name:'HMM',market:'KOSPI',sector:'해운'},
+  {code:'003490',name:'대한항공',market:'KOSPI',sector:'항공'},
+  {code:'012330',name:'현대모비스',market:'KOSPI',sector:'자동차부품'},
+  {code:'028260',name:'삼성물산',market:'KOSPI',sector:'건설'},
+  {code:'000810',name:'삼성화재',market:'KOSPI',sector:'보험'},
+  {code:'088350',name:'한화생명',market:'KOSPI',sector:'보험'},
+  {code:'032640',name:'LG유플러스',market:'KOSPI',sector:'통신'},
+  {code:'017670',name:'SK텔레콤',market:'KOSPI',sector:'통신'},
+  {code:'030200',name:'KT',market:'KOSPI',sector:'통신'},
+  {code:'011070',name:'LG이노텍',market:'KOSPI',sector:'전자부품'},
+  {code:'009830',name:'한화솔루션',market:'KOSPI',sector:'화학'},
+  {code:'010950',name:'S-Oil',market:'KOSPI',sector:'정유'},
+  {code:'036460',name:'한국가스공사',market:'KOSPI',sector:'에너지'},
+  {code:'000720',name:'현대건설',market:'KOSPI',sector:'건설'},
+  {code:'047050',name:'포스코인터내셔널',market:'KOSPI',sector:'무역'},
+  {code:'005490',name:'POSCO홀딩스',market:'KOSPI',sector:'철강'},
+  {code:'004020',name:'현대제철',market:'KOSPI',sector:'철강'},
+  {code:'034730',name:'SK',market:'KOSPI',sector:'지주'},
+  {code:'018260',name:'삼성에스디에스',market:'KOSPI',sector:'IT서비스'},
+  {code:'267250',name:'HD현대',market:'KOSPI',sector:'지주'},
+  {code:'329180',name:'HD현대중공업',market:'KOSPI',sector:'조선'},
+  {code:'006360',name:'GS건설',market:'KOSPI',sector:'건설'},
+  {code:'011780',name:'금호석유',market:'KOSPI',sector:'화학'},
+  {code:'021240',name:'코웨이',market:'KOSPI',sector:'가전'},
+  {code:'000100',name:'유한양행',market:'KOSPI',sector:'제약'},
+  {code:'128940',name:'한미약품',market:'KOSPI',sector:'제약'},
+  {code:'326030',name:'SK바이오팜',market:'KOSPI',sector:'바이오'},
+  {code:'293490',name:'카카오게임즈',market:'KOSDAQ',sector:'게임'},
+  {code:'259960',name:'크래프톤',market:'KOSPI',sector:'게임'},
+  {code:'112040',name:'위메이드',market:'KOSDAQ',sector:'게임'},
+  {code:'036570',name:'엔씨소프트',market:'KOSPI',sector:'게임'},
+  {code:'251270',name:'넷마블',market:'KOSPI',sector:'게임'},
+  {code:'035900',name:'JYP Ent.',market:'KOSDAQ',sector:'엔터'},
+  {code:'041510',name:'에스엠',market:'KOSPI',sector:'엔터'},
+  {code:'352820',name:'하이브',market:'KOSPI',sector:'엔터'},
+  {code:'122870',name:'와이지엔터테인먼트',market:'KOSDAQ',sector:'엔터'},
+  {code:'196170',name:'알테오젠',market:'KOSDAQ',sector:'바이오'},
+  {code:'091990',name:'셀트리온헬스케어',market:'KOSDAQ',sector:'바이오'},
+  {code:'145020',name:'휴젤',market:'KOSDAQ',sector:'바이오'},
+  {code:'214150',name:'클래시스',market:'KOSDAQ',sector:'의료기기'},
+  {code:'226330',name:'신테카바이오',market:'KOSDAQ',sector:'바이오'},
+  {code:'035510',name:'신세계I&C',market:'KOSDAQ',sector:'IT서비스'},
+  {code:'035250',name:'강원랜드',market:'KOSPI',sector:'레저'},
+  {code:'024110',name:'기업은행',market:'KOSPI',sector:'금융'},
+  {code:'139480',name:'이마트',market:'KOSPI',sector:'유통'},
+  {code:'004170',name:'신세계',market:'KOSPI',sector:'유통'},
+  {code:'023530',name:'롯데쇼핑',market:'KOSPI',sector:'유통'},
+  {code:'282330',name:'BGF리테일',market:'KOSPI',sector:'유통'},
+  {code:'097950',name:'CJ제일제당',market:'KOSPI',sector:'식품'},
+  {code:'003230',name:'삼양식품',market:'KOSPI',sector:'식품'},
+  {code:'271560',name:'오리온',market:'KOSPI',sector:'식품'},
+  {code:'000080',name:'하이트진로',market:'KOSPI',sector:'식음료'},
+  {code:'009150',name:'삼성전기',market:'KOSPI',sector:'전자부품'},
+  {code:'008770',name:'호텔신라',market:'KOSPI',sector:'여행'},
+  {code:'047810',name:'한국항공우주',market:'KOSPI',sector:'방산'},
+  {code:'012450',name:'한화에어로스페이스',market:'KOSPI',sector:'방산'},
+  {code:'064350',name:'현대로템',market:'KOSPI',sector:'방산'},
+  {code:'000150',name:'두산',market:'KOSPI',sector:'지주'},
+  {code:'006800',name:'미래에셋증권',market:'KOSPI',sector:'증권'},
+  {code:'071050',name:'한국금융지주',market:'KOSPI',sector:'증권'},
+  {code:'377300',name:'카카오페이',market:'KOSPI',sector:'핀테크'},
+  {code:'403550',name:'쏘카',market:'KOSDAQ',sector:'모빌리티'},
+  {code:'357780',name:'솔브레인',market:'KOSDAQ',sector:'소재'},
+  {code:'336370',name:'솔브레인홀딩스',market:'KOSDAQ',sector:'소재'},
+  {code:'232140',name:'와이씨케이',market:'KOSDAQ',sector:'반도체'},
+  {code:'058470',name:'리노공업',market:'KOSDAQ',sector:'반도체'},
+  {code:'131970',name:'테크윙',market:'KOSDAQ',sector:'반도체장비'},
+  {code:'079550',name:'LIG넥스원',market:'KOSPI',sector:'방산'},
+  {code:'298040',name:'효성중공업',market:'KOSPI',sector:'전기'},
+  {code:'010620',name:'HD현대미포',market:'KOSPI',sector:'조선'},
+  {code:'175330',name:'JB금융지주',market:'KOSPI',sector:'금융'},
+  {code:'138040',name:'메리츠금융지주',market:'KOSPI',sector:'금융'},
+  {code:'192820',name:'코스맥스',market:'KOSPI',sector:'화장품'},
+  {code:'090430',name:'아모레퍼시픽',market:'KOSPI',sector:'화장품'},
+  {code:'051900',name:'LG생활건강',market:'KOSPI',sector:'화장품'},
+];
 
 async function fetchCorpIndex() {
   const res = await fetch(`${BASE}/corpCode.xml?crtfc_key=${KEY}`, { headers: UA });
@@ -113,9 +182,8 @@ function absorb(store, row) {
 
 async function main() {
   if (!KEY) throw new Error('DART_API_KEY 환경변수 없음');
-  console.log('· 유니버스 구성 (KRX 전종목 시세)');
-  const { items: universe, trade_date } = await fetchUniverse();
-  console.log(`  → ${universe.length}종목 (기준일 ${trade_date})`);
+  const universe = UNIVERSE;
+  console.log(`· 유니버스: ${universe.length}종목 (하드코딩)`);
   console.log('· 상장사 색인 내려받는 중');
   const corpIndex = await fetchCorpIndex();
   const targets = universe.map(u => ({ ...u, corp: corpIndex.get(u.code) })).filter(u => u.corp);
@@ -146,7 +214,7 @@ async function main() {
     companies: targets.map(t => {
       const byYear = store.get(t.corp);
       const yearsArr = byYear ? [...byYear.values()].sort((a,b)=>a.year-b.year) : [];
-      return { code: t.code, name: t.name, corp_code: t.corp, years: yearsArr };
+      return { code: t.code, name: t.name, corp_code: t.corp, market: t.market, sector: t.sector, years: yearsArr };
     }).filter(c => c.years.length),
   };
   await fs.mkdir(path.dirname(OUT), { recursive: true });

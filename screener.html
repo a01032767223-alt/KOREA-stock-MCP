@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E141B">
+<title>종목 스크리너 · 한국주식 정밀분석</title>
+<meta name="description" content="종합점수 등급으로 KOSPI·KOSDAQ 350종목을 추려봅니다. 매수 추천 목록이 아닙니다.">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="manifest" href="./manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{
+  --ink:#0E141B; --surface:#1B2531; --surface2:#24313F; --line:#3A4A5A;
+  --text:#F6FAFF; --muted:#C3CFDC; --faint:#9AA8B8;
+  --up:#FF6B74; --down:#5B9BFF; --assume:#F0B247; --ok:#4FCB93; --na:#8593A3;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ink);color:var(--text);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:15.5px;line-height:1.62;-webkit-text-size-adjust:100%;padding:0 16px 64px}
+.wrap{max-width:900px;margin:0 auto}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)} .na{color:var(--faint)}
+a{color:inherit}
+
+/* 헤더 */
+header{padding:22px 0 8px}
+h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13.5px;margin-top:4px;font-family:var(--mono)}
+.tabs{display:flex;gap:8px;margin-top:14px}
+.tab{padding:8px 15px;border-radius:99px;border:1px solid var(--line);background:var(--surface);
+  color:var(--muted);font-size:14px;font-weight:700;text-decoration:none}
+.tab.on{background:var(--text);color:var(--ink);border-color:var(--text)}
+
+/* 경고 배너 */
+.warn-banner{position:sticky;top:0;z-index:30;margin:14px -16px 0;padding:11px 16px;
+  background:rgba(240,178,71,.16);border-top:1px solid rgba(240,178,71,.45);
+  border-bottom:1px solid rgba(240,178,71,.45);
+  backdrop-filter:blur(8px);font-size:13.5px;line-height:1.5}
+.warn-banner b{color:var(--assume)}
+
+/* 필터 */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:16px;margin-top:14px}
+.flabel{font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--muted);
+  text-transform:uppercase;margin-bottom:9px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;
+  border:1px solid var(--line);background:var(--surface2);color:var(--text);
+  font-size:14px;font-weight:700;cursor:pointer;transition:.12s}
+.chip:hover{border-color:var(--faint)}
+.chip .dot{width:9px;height:9px;border-radius:3px;flex:none}
+.chip .cnt{font-family:var(--mono);font-size:12.5px;color:var(--faint);font-weight:600}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.chip[aria-pressed="true"] .cnt{color:rgba(14,20,27,.6)}
+.chip:focus-visible{outline:2px solid var(--down);outline-offset:2px}
+.g-S{background:#4FCB93} .g-A{background:#8FD46F} .g-B{background:#F0B247}
+.g-C{background:#F58C5B} .g-D{background:#FF6B74} .g-N{background:#8593A3}
+
+.frow{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;padding-top:15px;
+  border-top:1px solid var(--line)}
+.fgroup{flex:1;min-width:150px}
+select{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--line);
+  border-radius:9px;padding:9px 11px;font-size:14px;font-family:inherit}
+.toggle{display:flex;align-items:flex-start;gap:9px;font-size:14px;cursor:pointer;
+  color:var(--text);line-height:1.45}
+.toggle input{margin:3px 0 0;width:17px;height:17px;accent-color:var(--ok);flex:none}
+.toggle small{display:block;color:var(--faint);font-size:12.5px;margin-top:2px}
+
+/* 결과 헤더 */
+.rhead{display:flex;justify-content:space-between;align-items:baseline;
+  margin:22px 0 10px;gap:12px;flex-wrap:wrap}
+.rcount{font-size:15px;font-weight:700}
+.rcount b{font-family:var(--mono);font-size:18px}
+.rsort{font-size:13.5px;color:var(--muted)}
+
+/* 종목 카드 */
+.list{display:grid;gap:9px}
+.row{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:14px 15px;text-decoration:none;color:inherit;transition:.12s}
+.row:hover{border-color:var(--faint);background:var(--surface2)}
+.row:focus-visible{outline:2px solid var(--down);outline-offset:2px}
+.r1{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rname{font-size:16.5px;font-weight:800;letter-spacing:-.01em}
+.rmeta{font-size:12.5px;color:var(--faint);font-family:var(--mono);margin-top:2px}
+.rprice{text-align:right;flex:none}
+.rprice .p{font-size:16px;font-weight:700;font-family:var(--mono)}
+.rprice .c{font-size:12.5px;font-family:var(--mono);margin-top:1px}
+.rscore{flex:none;text-align:center;min-width:62px;padding:5px 8px;border-radius:10px;
+  border:1px solid var(--line);background:var(--surface2)}
+.rscore .s{font-size:21px;font-weight:800;font-family:var(--mono);line-height:1.1}
+.rscore .g{font-size:11px;font-weight:700;color:var(--muted);margin-top:1px}
+
+.r2{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+.met{min-width:0}
+.met .k{font-size:11px;color:var(--faint);letter-spacing:.03em}
+.met .v{font-size:14px;font-weight:700;font-family:var(--mono);margin:1px 0 4px}
+.bar{height:5px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+
+.r3{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px;align-items:center}
+.tag{font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;border:1px solid}
+.tag.buy{color:var(--ok);border-color:rgba(79,203,147,.5);background:rgba(79,203,147,.12)}
+.tag.sell{color:var(--up);border-color:rgba(255,107,116,.5);background:rgba(255,107,116,.12)}
+.tag.neutral{color:var(--muted);border-color:var(--line);background:var(--surface2)}
+.tag.flag{color:var(--up);border-color:rgba(255,107,116,.45);background:rgba(255,107,116,.09)}
+.tag.miss{color:var(--faint);border-color:var(--line);background:transparent}
+.tag.ctx{color:var(--down);border-color:rgba(91,155,255,.4);background:rgba(91,155,255,.1)}
+
+/* 상위 코멘트 */
+.topnote{background:rgba(91,155,255,.08);border:1px solid rgba(91,155,255,.4);
+  border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px;line-height:1.62}
+.topnote b{color:var(--text)}
+
+/* 빈 결과 · 상태 */
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;
+  padding:34px 20px;text-align:center}
+.empty .t{font-size:16px;font-weight:800;margin-bottom:8px}
+.empty .d{font-size:14px;color:var(--muted);line-height:1.65;max-width:430px;margin:0 auto}
+.state{padding:34px 4px;color:var(--muted);font-family:var(--mono);font-size:14px}
+.state.err{color:var(--text);background:var(--surface2);border-left:3px solid var(--up);
+  border-radius:8px;padding:16px;font-family:inherit;line-height:1.6}
+.more{display:block;width:100%;margin-top:12px;padding:13px;border-radius:11px;
+  border:1px solid var(--line);background:var(--surface);color:var(--text);
+  font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.more:hover{background:var(--surface2)}
+footer{margin-top:30px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--faint);line-height:1.7}
+@media (max-width:520px){
+  .r2{grid-template-columns:repeat(2,1fr)}
+  .rname{font-size:15.5px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>종목 스크리너</h1>
+  <div class="sub" id="asof">데이터 불러오는 중…</div>
+  <nav class="tabs">
+    <a class="tab on" href="./screener.html">스크리너</a>
+    <a class="tab" href="./index.html">정밀분석</a>
+  </nav>
+</header>
+
+<div class="warn-banner">
+  <b>⚠️ 매수 추천 종목이 아닙니다.</b> 재무 지표상 «가격 매력도»만으로 추린 검토 후보입니다.
+  실제 매수 전 반드시 개별 분석과 최근 공시를 확인하세요.
+</div>
+
+<section class="panel">
+  <div class="flabel">등급 선택</div>
+  <div class="chips" id="grades"></div>
+
+  <div class="frow">
+    <div class="fgroup">
+      <div class="flabel">시장</div>
+      <select id="market">
+        <option value="">전체</option>
+        <option value="KOSPI">KOSPI</option>
+        <option value="KOSDAQ">KOSDAQ</option>
+      </select>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">신호</div>
+      <select id="signal">
+        <option value="">전체</option>
+        <option value="buy">매수 후보만</option>
+        <option value="sell">매도 검토만</option>
+        <option value="neutral">중립만</option>
+      </select>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">정렬</div>
+      <select id="sort">
+        <option value="total">종합점수 높은순</option>
+        <option value="per">PER 낮은순</option>
+        <option value="pbr">PBR 낮은순</option>
+        <option value="roe">ROE 높은순</option>
+        <option value="cagr">이익성장률 높은순</option>
+        <option value="cap">시가총액 큰순</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="frow">
+    <label class="toggle">
+      <input type="checkbox" id="clean" checked>
+      <span>재무 적신호 없는 종목만
+        <small>적자·자본잠식·부채비율 200% 초과 종목을 제외합니다. 초보자에게 권장합니다.</small></span>
+    </label>
+  </div>
+</section>
+
+<div class="rhead">
+  <div class="rcount" id="rcount"></div>
+  <div class="rsort" id="rsort"></div>
+</div>
+
+<div id="result"><div class="state">불러오는 중…</div></div>
+
+<footer>
+  종합점수는 PER 25% · PBR 20% · ROE 25% · 이익성장률 20% · 과거 밸류에이션(52주 밴드) 10%
+  가중 평균입니다. 산출 불가한 지표는 제외하고 남은 지표로 재계산합니다.<br>
+  재무·공시: DART 전자공시 사업보고서(연간). 시세·시가총액: KRX. 52주 고저: 야후 파이낸스.<br>
+  이 화면은 공시·시세 데이터의 산술 가공 결과이며 투자 자문이 아닙니다.
+</footer>
+</div>
+
+<script type="module">
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isNil=v=>v===null||v===undefined;
+const fmt=(v,d=0)=>isNil(v)?"없음":Number(v).toLocaleString("ko-KR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtCap=v=>isNil(v)?"없음":(v>=1e12?`${(v/1e12).toFixed(1)}조`:`${Math.round(v/1e8).toLocaleString("ko-KR")}억`);
+
+const GRADES=[
+  {key:"S",label:"매우 매력적",range:"80점 이상"},
+  {key:"A",label:"매력적",range:"65~79점"},
+  {key:"B",label:"보통",range:"50~64점"},
+  {key:"C",label:"신중",range:"35~49점"},
+  {key:"D",label:"관망",range:"34점 이하"},
+  {key:"N",label:"판단 불가",range:"지표 부족"},
+];
+/* 업종별로 지표의 의미가 다른 경우 맥락을 덧붙입니다 */
+const SECTOR_CONTEXT=[
+  {re:/금융|은행|증권|보험|지주/,note:"금융·지주업은 PBR 1배 미만이 일반적입니다"},
+  {re:/바이오|제약|의료/,note:"신약 개발사는 적자·고PER이 흔합니다"},
+  {re:/건설|조선/,note:"수주산업은 이익 변동이 큽니다"},
+];
+const PAGE=25;
+let DATA=null, shown=PAGE;
+const state={grades:new Set(["S","A"]),market:"",signal:"",sort:"total",clean:true};
+
+const barColor=s=>s>=70?"var(--ok)":(s>=40?"var(--assume)":"var(--up)");
+const gradeLabel=k=>(GRADES.find(g=>g.key===k)||{}).label||"—";
+
+function match(it){
+  if(state.grades.size&&!state.grades.has(it.grade)) return false;
+  if(state.market&&it.m!==state.market) return false;
+  if(state.signal&&it.sig!==state.signal) return false;
+  if(state.clean&&it.flags.length) return false;
+  return true;
+}
+function sortItems(arr){
+  const key=state.sort;
+  const dir={per:1,pbr:1}[key]?1:-1;               // PER·PBR은 낮을수록 앞
+  return arr.slice().sort((a,b)=>{
+    const av=a[key],bv=b[key];
+    if(isNil(av)&&isNil(bv)) return 0;
+    if(isNil(av)) return 1;                        // 값 없는 종목은 항상 뒤로
+    if(isNil(bv)) return -1;
+    return (av-bv)*dir;
+  });
+}
+
+function sectorNote(sec){
+  if(!sec) return null;
+  const hit=SECTOR_CONTEXT.find(c=>c.re.test(sec));
+  return hit?hit.note:null;
+}
+
+function rowHTML(it){
+  const metrics=[
+    {k:"PER",v:isNil(it.per)?"없음":`${fmt(it.per,1)}배`,s:it.sc.per},
+    {k:"PBR",v:isNil(it.pbr)?"없음":`${fmt(it.pbr,2)}배`,s:it.sc.pbr},
+    {k:"ROE",v:isNil(it.roe)?"없음":`${fmt(it.roe,1)}%`,s:it.sc.roe},
+    {k:"순이익 성장",v:isNil(it.cagr)?"없음":`연 ${fmt(it.cagr,1)}%`,s:it.sc.growth},
+  ].map(m=>`<div class="met">
+      <div class="k">${m.k}</div>
+      <div class="v ${isNil(m.s)?"na":""}">${esc(m.v)}</div>
+      <div class="bar"><i style="width:${isNil(m.s)?0:m.s}%;background:${isNil(m.s)?"transparent":barColor(m.s)}"></i></div>
+    </div>`).join("");
+
+  const sigTag={buy:'<span class="tag buy">🟢 매수 후보</span>',
+                sell:'<span class="tag sell">🔴 매도 검토</span>',
+                neutral:'<span class="tag neutral">⚪ 중립</span>'}[it.sig];
+  const flagTags=it.flags.map(f=>`<span class="tag flag">⚠ ${esc(f)}</span>`).join("");
+  const missTag=it.miss.length?`<span class="tag miss">지표 ${it.miss.length}개 산출 불가</span>`:"";
+  const ctx=sectorNote(it.sec);
+  const ctxTag=ctx?`<span class="tag ctx">ℹ ${esc(ctx)}</span>`:"";
+  const chg=isNil(it.chg)?"":`<div class="c ${it.chg>0?"up":(it.chg<0?"down":"na")}">${
+    it.chg>0?"▲":(it.chg<0?"▼":"")} ${fmt(Math.abs(it.chg),2)}%</div>`;
+
+  return `<a class="row" href="./index.html#${esc(it.t)}">
+    <div class="r1">
+      <div style="min-width:0">
+        <div class="rname">${esc(it.n)}</div>
+        <div class="rmeta">${esc(it.t)} · ${esc(it.m)}${it.sec?" · "+esc(it.sec):""} · ${fmtCap(it.cap)}</div>
+      </div>
+      <div class="rprice">
+        <div class="p">${fmt(it.p)}원</div>${chg}
+      </div>
+      <div class="rscore">
+        <div class="s" style="color:${isNil(it.total)?"var(--faint)":barColor(it.total)}">${isNil(it.total)?"—":it.total}</div>
+        <div class="g">${esc(gradeLabel(it.grade))}</div>
+      </div>
+    </div>
+    <div class="r2">${metrics}</div>
+    <div class="r3">${sigTag}${flagTags}${missTag}${ctxTag}</div>
+  </a>`;
+}
+
+/* 상위 종목에 «왜 높은가 / 무엇을 확인할까» 한 줄 */
+function topNote(list){
+  if(!list.length||isNil(list[0].total)) return "";
+  const it=list[0];
+  const driver=Object.entries(it.sc).sort((a,b)=>b[1]-a[1])[0];
+  const KO={per:"PER이 낮아서",pbr:"PBR이 낮아서",roe:"ROE가 높아서",
+            growth:"이익 성장률이 높아서",hist:"주가가 52주 밴드 하단이라서"};
+  const checks=[];
+  if(!isNil(it.roe)&&it.roe<8) checks.push("ROE가 낮아 «싼 데는 이유가 있는» 경우일 수 있습니다");
+  if(!isNil(it.band)&&it.band<15) checks.push("주가가 1년 최저가 부근이라 하락 이유를 먼저 확인해야 합니다");
+  if(it.miss.length) checks.push(`지표 ${it.miss.length}개가 산출 불가라 점수 신뢰도가 낮습니다`);
+  if(!checks.length) checks.push("최근 공시에서 실적 급변이나 일회성 이익이 없었는지 확인하세요");
+  return `<div class="topnote">
+    <b>${esc(it.n)}</b>이(가) ${it.total}점으로 가장 높습니다 — 주로 ${KO[driver[0]]||"지표가 좋아서"}입니다.
+    다만 ${esc(checks[0])}.</div>`;
+}
+
+function render(){
+  const all=DATA.items;
+  // 등급별 개수는 «등급 외 조건»만 적용한 상태로 세어야 선택 전에 가늠이 됩니다
+  const base=all.filter(it=>
+    (!state.market||it.m===state.market)&&
+    (!state.signal||it.sig===state.signal)&&
+    (!state.clean||!it.flags.length));
+  const counts={};
+  base.forEach(it=>counts[it.grade]=(counts[it.grade]||0)+1);
+
+  $("#grades").innerHTML=GRADES.map(g=>`
+    <button class="chip" data-g="${g.key}" aria-pressed="${state.grades.has(g.key)}"
+            title="${g.range}">
+      <span class="dot g-${g.key}"></span>${g.label}
+      <span class="cnt">${counts[g.key]||0}</span>
+    </button>`).join("");
+
+  const list=sortItems(all.filter(match));
+  const sortKO={total:"종합점수 높은순",per:"PER 낮은순",pbr:"PBR 낮은순",
+                roe:"ROE 높은순",cagr:"이익성장률 높은순",cap:"시가총액 큰순"}[state.sort];
+  $("#rcount").innerHTML=`<b>${list.length}</b>종목`;
+  $("#rsort").textContent=sortKO;
+
+  if(!list.length){
+    $("#result").innerHTML=`<div class="empty">
+      <div class="t">조건에 맞는 종목이 없습니다</div>
+      <div class="d">시장 상황에 따라 특정 등급이 비어 있는 것은 정상입니다.
+        조건을 낮추기보다, 해당 등급의 종목이 나타날 때까지 기다리는 것도 좋은 선택입니다.
+        다른 등급을 함께 선택해 살펴보셔도 됩니다.</div></div>`;
+    return;
+  }
+  const page=list.slice(0,shown);
+  $("#result").innerHTML=
+    (state.sort==="total"?topNote(list):"")+
+    `<div class="list">${page.map(rowHTML).join("")}</div>`+
+    (shown<list.length
+      ? `<button class="more" id="more">${list.length-shown}종목 더 보기</button>` : "");
+  const more=$("#more");
+  if(more) more.onclick=()=>{shown+=PAGE;render();};
+}
+
+function bind(){
+  $("#grades").addEventListener("click",e=>{
+    const b=e.target.closest(".chip"); if(!b) return;
+    const k=b.dataset.g;
+    state.grades.has(k)?state.grades.delete(k):state.grades.add(k);
+    shown=PAGE; render();
+  });
+  for(const [id,key] of [["market","market"],["signal","signal"],["sort","sort"]]){
+    $("#"+id).addEventListener("change",e=>{state[key]=e.target.value; shown=PAGE; render();});
+  }
+  $("#clean").addEventListener("change",e=>{state.clean=e.target.checked; shown=PAGE; render();});
+}
+
+(async()=>{
+  try{
+    const res=await fetch("./data/scores.json",{cache:"no-cache"});
+    if(!res.ok) throw new Error(`데이터 파일을 불러오지 못했습니다 (${res.status})`);
+    DATA=await res.json();
+    $("#asof").textContent=
+      `${DATA.as_of} 장마감 기준 · 재무 ${DATA.fin_as_of} 수집 · ${DATA.count}종목`
+      +(DATA.sample?" · 샘플 데이터":"");
+    bind(); render();
+  }catch(e){
+    $("#result").innerHTML=`<div class="state err">
+      <b>목록을 불러오지 못했습니다.</b><br>${esc(e.message)}<br><br>
+      data/scores.json이 아직 만들어지지 않았다면,
+      GitHub 저장소의 Actions 탭에서 «재무 수집 (분기)» 워크플로를 한 번 실행하세요.</div>`;
+    $("#asof").textContent="데이터 없음";
+  }
+})();
+</script>
+</body>
+</html>

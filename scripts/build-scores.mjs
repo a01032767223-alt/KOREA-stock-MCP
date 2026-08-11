@@ -17,7 +17,7 @@ import { fetchUniverse } from './krx.mjs';
 import {
   isNil, cagr, computeMultiples, computeROE,
   buildScorecard, gradeOf, detectSignal, evaluateFlags,
-} from '../engine/score.mjs';
+} from '../score.mjs';
 
 const FIN = path.resolve('data/financials.json');
 const OUT = path.resolve('data/scores.json');

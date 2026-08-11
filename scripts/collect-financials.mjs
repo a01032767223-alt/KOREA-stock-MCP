@@ -116,9 +116,14 @@ function absorb(store, row) {
 async function main() {
   if (!KEY) throw new Error('DART_API_KEY 환경변수가 없습니다.');
 
-  console.log('· 유니버스 구성 (KRX 전종목 시세)');
-  const { items: universe, trade_date } = await fetchUniverse();
-  console.log(`  → ${universe.length}종목 (기준일 ${trade_date})`);
+console.log('· 유니버스 구성 (KRX 전종목 시세)');
+// 임시: KRX API 400 에러 우회
+const universe = [
+  { code: '005930', name: '삼성전자', market: 'KOSPI', sector: '반도체', price: 70000, changePct: 1.5, marketCap: 420000000000000, shares: 6000000000 },
+  { code: '000660', name: 'SK하이닉스', market: 'KOSPI', sector: '반도체', price: 110000, changePct: -0.5, marketCap: 85000000000000, shares: 772727273 },
+];
+const trade_date = new Date().toISOString().slice(0, 10);
+console.log(`  → ${universe.length}종목 (기준일 ${trade_date}) [임시]`);
 
   console.log('· 상장사 색인 내려받는 중');
   const corpIndex = await fetchCorpIndex();
